@@ -12,39 +12,43 @@ bool savePlots = false;
 //Compute errors using TEfficiency?
 bool effErrors = true;
 
+//Ratio of etas and pizeros to photons
+float etaPhotonRatio = 1.0;
+float pizeroPhotonRatio = 1.0;
+
 //Rebin factor
 const int REBINF = 40;
 
 const int NBINSFNP = 9;
-
-//Number of histograms for each particle species
-const int NHISTETAS = 20; //5 etas x 4 photons
-const int NHISTPIZEROS = 12; //3 pizeros x 4 photons
-const int NHISTPHOTONS = 4;
 
 //Number of variations for each particle species
 const int NVARETAS = 5;
 const int NVARPIZEROS = 3;
 const int NVARPHOTONS = 4;
 
+//Spectra
+TF1 *f_photon_spectrum[NVARPHOTONS];
+TF1 *f_pizero_spectrum[NVARPIZEROS];
+TF1 *f_eta_spectrum[NVARETAS];
+
 //Total evaluated FNPs
-const int NUMFNPS = 60;
+const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS;
 
 //RMS of all systematic variations on FNP
 float rmsFNP[NBINSFNP];
 
 //Simulated electrons
-TH1D *h_elec_pT_pizeros[NHISTPIZEROS];
-TH1D *h_elec_pT_pizeros_rejected[NHISTPIZEROS];
-TH1D *h_elec_pT_pizeros_accepted[NHISTPIZEROS];
+TH1D *h_elec_pT_pizeros[NVARPIZEROS];
+TH1D *h_elec_pT_pizeros_rejected[NVARPIZEROS];
+TH1D *h_elec_pT_pizeros_accepted[NVARPIZEROS];
 
-TH1D *h_elec_pT_photons[NHISTPHOTONS];
-TH1D *h_elec_pT_photons_rejected[NHISTPHOTONS];
-TH1D *h_elec_pT_photons_accepted[NHISTPHOTONS];
+TH1D *h_elec_pT_photons[NVARPHOTONS];
+TH1D *h_elec_pT_photons_rejected[NVARPHOTONS];
+TH1D *h_elec_pT_photons_accepted[NVARPHOTONS];
 
-TH1D *h_elec_pT_etas[NHISTETAS];
-TH1D *h_elec_pT_etas_rejected[NHISTETAS];
-TH1D *h_elec_pT_etas_accepted[NHISTETAS];
+TH1D *h_elec_pT_etas[NVARETAS];
+TH1D *h_elec_pT_etas_rejected[NVARETAS];
+TH1D *h_elec_pT_etas_accepted[NVARETAS];
 
 //Data electrons + hadrons
 TH1D *h_elec_pT;
@@ -64,9 +68,9 @@ TH1D *h_elec_pT_inclusive;
 TH1D *h_elec_pT_isolated;
 
 //Survival rate for each particle species
-TH1D *h_survival_photons[NHISTPHOTONS];
-TH1D *h_survival_pizeros[NHISTPIZEROS];
-TH1D *h_survival_etas[NHISTETAS];
+TH1D *h_survival_photons[NVARPHOTONS];
+TH1D *h_survival_pizeros[NVARPIZEROS];
+TH1D *h_survival_etas[NVARETAS];
 
 //Ingredients for FNP calculation
 TH1D *h_conversion_efficiency[NUMFNPS];
@@ -136,33 +140,21 @@ void readFiles()
 	TFile *fSimsPhoton = new TFile("Sims/Cocktail062617_2/twophotons_cdphiana.root");
 	TFile *fSimsEta = new TFile("Sims/Cocktail062617_2/twoetas_cdphiana.root");
 
-	int numHisto = 0;
-	for (int i = 0; i < NVARPHOTONS; i++)
+	for (int i = 0; i < NVARPIZEROS; i++)
 	{
-		for (int j = 0; j < NVARPIZEROS; j++)
-		{
-			h_elec_pT_pizeros[numHisto]          = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_%i_%i", i, j));
-			h_elec_pT_pizeros_rejected[numHisto] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i_%i", i, j));
-			h_elec_pT_pizeros_accepted[numHisto] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i_%i", i, j));
-
-			numHisto++;
-		}
+		h_elec_pT_pizeros[i]          = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_%i", i));
+		h_elec_pT_pizeros_rejected[i] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i", i));
+		h_elec_pT_pizeros_accepted[i] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i", i));
 	}
 
-	numHisto = 0;
-	for (int i = 0; i < NVARPHOTONS; i++)
+	for (int i = 0; i < NVARETAS; i++)
 	{
-		for (int j = 0; j < NVARETAS; j++)
-		{
-			h_elec_pT_etas[numHisto]          = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_%i_%i", i, j));
-			h_elec_pT_etas_rejected[numHisto] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i_%i", i, j));
-			h_elec_pT_etas_accepted[numHisto] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i_%i", i, j));
-
-			numHisto++;
-		}
+		h_elec_pT_etas[i]          = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_%i", i));
+		h_elec_pT_etas_rejected[i] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i", i));
+		h_elec_pT_etas_accepted[i] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i", i));
 	}
 
-	for (int i = 0; i < NHISTPHOTONS; i++)
+	for (int i = 0; i < NVARPHOTONS; i++)
 	{
 		h_elec_pT_photons[i]          = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_%i", i));
 		h_elec_pT_photons_rejected[i] = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i", i));
@@ -184,6 +176,27 @@ void readFiles()
 	h_hadron_pT_rejected = (TH1D*) fData->Get("h_hadron_pT_rejected_pTcut");
 	h_hadron_pT_accepted = (TH1D*) fData->Get("h_hadron_pT_notrejected_pTcut");
 }
+
+
+float getEtaPhotonRatio(int etaIndex, int photonIndex)
+{
+	//Take the ratio of the total yield of etas to photons for a given set of spectra
+	float etaYield = f_eta_spectrum[etaIndex]->Eval(18.0);
+	float photonYield = f_photon_spectrum[photonIndex]->Eval(18.0);
+
+	return etaYield/photonYield;
+}
+
+
+float getPizeroPhotonRatio(int pizeroIndex, int photonIndex)
+{
+	//Take the ratio of the total yield of etas to photons for a given set of spectra
+	float pizeroYield = f_pizero_spectrum[pizeroIndex]->Eval(18.0);
+	float photonYield = f_photon_spectrum[photonIndex]->Eval(18.0);
+
+	return pizeroYield/photonYield;
+}
+
 
 void rebinHistograms()
 {
@@ -213,34 +226,21 @@ void rebinHistograms()
 	//Rebin data electron spectrum with variable bin width
 	double bins[10] = {1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0};
 
-	int numHisto = 0;
-	for (int i = 0; i < NVARPHOTONS; i++)
+	for (int i = 0; i < NVARPIZEROS; i++)
 	{
-		for (int j = 0; j < NVARPIZEROS; j++)
-		{
-			h_elec_pT_pizeros[numHisto] = (TH1D*) h_elec_pT_pizeros[numHisto]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_rebinned_%i_%i", i, j), bins);
-			h_elec_pT_pizeros_rejected[numHisto] = (TH1D*) h_elec_pT_pizeros_rejected[numHisto]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_rejected_rebinned_%i_%i", i, j), bins);
-			h_elec_pT_pizeros_accepted[numHisto] = (TH1D*) h_elec_pT_pizeros_accepted[numHisto]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_accepted_rebinned_%i_%i", i, j), bins);
-
-			numHisto++;
-		}
+		h_elec_pT_pizeros[i] = (TH1D*) h_elec_pT_pizeros[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_rebinned_%i", i), bins);
+		h_elec_pT_pizeros_rejected[i] = (TH1D*) h_elec_pT_pizeros_rejected[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_rejected_rebinned_%i", i), bins);
+		h_elec_pT_pizeros_accepted[i] = (TH1D*) h_elec_pT_pizeros_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_accepted_rebinned_%i", i), bins);
 	}
 
-	numHisto = 0;
-	for (int i = 0; i < NVARPHOTONS; i++)
+	for (int i = 0; i < NVARETAS; i++)
 	{
-		for (int j = 0; j < NVARETAS; j++)
-		{
-			h_elec_pT_etas[numHisto] = (TH1D*) h_elec_pT_etas[numHisto]->Rebin(NBINSFNP, Form("h_elec_pT_etas_rebinned_%i_%i", i, j), bins);
-			h_elec_pT_etas_rejected[numHisto] = (TH1D*) h_elec_pT_etas_rejected[numHisto]->Rebin(NBINSFNP, Form("h_elec_pT_etas_rejected_rebinned_%i_%i", i, j), bins);
-			h_elec_pT_etas_accepted[numHisto] = (TH1D*) h_elec_pT_etas_accepted[numHisto]->Rebin(NBINSFNP, Form("h_elec_pT_etas_accepted_rebinned_%i_%i", i, j), bins);
-
-			numHisto++;
-		}
+		h_elec_pT_etas[i] = (TH1D*) h_elec_pT_etas[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_rebinned_%i", i), bins);
+		h_elec_pT_etas_rejected[i] = (TH1D*) h_elec_pT_etas_rejected[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_rejected_rebinned_%i", i), bins);
+		h_elec_pT_etas_accepted[i] = (TH1D*) h_elec_pT_etas_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_accepted_rebinned_%i", i), bins);
 	}
 
-
-	for (int i = 0; i < NHISTPHOTONS; i++)
+	for (int i = 0; i < NVARPHOTONS; i++)
 	{
 		h_elec_pT_photons[i] = (TH1D*) h_elec_pT_photons[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_rebinned_%i", i), bins);
 		h_elec_pT_photons_rejected[i] = (TH1D*) h_elec_pT_photons_rejected[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_rejected_rebinned_%i", i), bins);
@@ -259,60 +259,68 @@ void rebinHistograms()
 }
 
 
+void defineSpectra()
+{
+	f_photon_spectrum[0] = new TF1("f_photon_spectrum_0", "2*TMath::Pi()*x*[0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])", 0.0, 18.0);
+	f_photon_spectrum[0]->SetParameters(0.242345, -0.0827585, 0.00918447, 4.13943, 13.6974);
+
+	f_photon_spectrum[1] = new TF1("f_photon_spectrum_1", "2*TMath::Pi()*x*([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4]))", 0.0, 18.0);
+	f_photon_spectrum[1]->SetParameters(13.0488, -0.191588, 0.0164036, 0.999159, 8.42105);
+
+	f_photon_spectrum[2] = new TF1("f_photon_spectrum_2", "2*TMath::Pi()*x*(([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])))", 0.0, 18.0);
+	f_photon_spectrum[2]->SetParameters(0.171216, -0.0312528, 0.00442746, 11.6472, 29.538);
+
+	f_photon_spectrum[3] = new TF1("f_photon_spectrum_3", "2*TMath::Pi()*x*(([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])))", 0.0, 18.0);
+	f_photon_spectrum[3]->SetParameters(0.012215, -0.0539112, 0.00527051, 4.69066, 11.7111);
+
+
+	f_pizero_spectrum[0] = new TF1("f_pizero_spectrum_0", "2*TMath::Pi()*x*([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4]))", 0.0, 18.0);
+	f_pizero_spectrum[0]->SetParameters(254.066, 0.470186, 0.0380066, 0.737713, 8.28442);
+
+	f_pizero_spectrum[1] = new TF1("f_pizero_spectrum_1", "2*TMath::Pi()*x*(([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])))", 0.0, 18.0);
+	f_pizero_spectrum[1]->SetParameters(339.852, 0.417738, 0.0599019, 0.719301, 8.33941);
+
+	f_pizero_spectrum[2] = new TF1("f_pizero_spectrum_2", "2*TMath::Pi()*x*(([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])))", 0.0, 18.0);
+	f_pizero_spectrum[2]->SetParameters(184.594, 0.524929, 0.0111792, 0.762548, 8.24103);
+
+
+	f_eta_spectrum[0] = new TF1("f_eta_spectrum_0", "TMath::Power(TMath::Sqrt(1+(0.135/x)*(0.135/x)),-1.0)*0.5*TMath::Sqrt(1+(0.135/x)*(0.135/x))*(2*TMath::Pi()*x*([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])))", 0.0, 18.0);
+	f_eta_spectrum[0]->SetParameters(254.066, 0.470186, 0.0380066, 0.737713, 8.28442);
+
+	f_eta_spectrum[1] = new TF1("f_eta_spectrum_1", "2*TMath::Pi()*x*(([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])))", 0.0, 18.0);
+	f_eta_spectrum[1]->SetParameters(1201.68, -0.0135258, 0.0215599, 0.782018, 9.31206);
+
+	f_eta_spectrum[2] = new TF1("f_eta_spectrum_2", "2*TMath::Pi()*x*([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4]))", 0.0, 18.0);
+	f_eta_spectrum[2]->SetParameters(1372.01, 0.0103744, 0.0225786, 0.71981, 9.07938);
+
+	f_eta_spectrum[3] = new TF1("f_eta_spectrum_3", "2*TMath::Pi()*x*([0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4]))", 0.0, 18.0);
+	f_eta_spectrum[3]->SetParameters(545.206, 0.421156, -0.00156003, 0.58791, 8.04994);
+
+	f_eta_spectrum[4] = new TF1("f_eta_spectrum_4", "2*TMath::Pi()*x*(([0]*(([1]-1)*([1]-1))/(([1]*[2]+0.53*([1]-1))*([1]*[2]+0.53))*pow(([1]*[2]+TMath::Sqrt(0.53*0.53+x*x))/([1]*[2]+0.53),-1*[1])))", 0.0, 18.0);
+	f_eta_spectrum[4]->SetParameters(0.786558, 9.24328, 0.100848);
+}
+
+
 void calculateSpeciesSurvival()
 {
 	//Survival = Accepted / Total
-
-	int numHisto = 0;
-	for (int i = 0; i < NVARPHOTONS; i++)
+	for (int i = 0; i < NVARETAS; i++)
 	{
-		for (int j = 0; j < NVARETAS; j++)
-		{
-			h_survival_etas[numHisto] = (TH1D*) h_elec_pT_etas_accepted[numHisto]->Clone(Form("h_survival_etas_%i_%i", i, j));
-			h_survival_etas[numHisto]->Divide(h_elec_pT_etas[numHisto]);
-
-			numHisto++;
-		}
+		h_survival_etas[i] = (TH1D*) h_elec_pT_etas_accepted[i]->Clone(Form("h_survival_etas_%i", i));
+		h_survival_etas[i]->Divide(h_elec_pT_etas[i]);
 	}
 
-	numHisto = 0;
-	for (int i = 0; i < NVARPHOTONS; i++)
+	for (int i = 0; i < NVARPIZEROS; i++)
 	{
-		for (int j = 0; j < NVARPIZEROS; j++)
-		{
-			h_survival_pizeros[numHisto] = (TH1D*) h_elec_pT_pizeros_accepted[numHisto]->Clone(Form("h_survival_pizeros_%i_%i", i, j));
-			h_survival_pizeros[numHisto]->Divide(h_elec_pT_pizeros[numHisto]);
-			numHisto++;
-		}
+		h_survival_pizeros[i] = (TH1D*) h_elec_pT_pizeros_accepted[i]->Clone(Form("h_survival_pizeros_%i", i));
+		h_survival_pizeros[i]->Divide(h_elec_pT_pizeros[i]);
 	}
 
-	for (int i = 0; i < NHISTPHOTONS; i++)
+	for (int i = 0; i < NVARPHOTONS; i++)
 	{
 		h_survival_photons[i] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_survival_photons_%i", i));
 		h_survival_photons[i]->Divide(h_elec_pT_photons[i]);
 	}
-
-}
-
-
-int getPhotonVariationPizero(int index)
-{
-	//Pizero histograms are labeled with a number from 0 to 11, as follows:
-	// pizero index: photon variation; pizero variation
-	// 0:  0 0
-	// 1:  0 1
-	// 2:  0 2
-	// 3;  1 0
-	// 4;  1 1
-	// ...
-	// 11: 3 2
-
-	return index / NVARPIZEROS;
-}
-
-int getPhotonVariationEta(int index)
-{
-	return index / NVARETAS;
 }
 
 
@@ -320,11 +328,7 @@ void calculateConversionEfficiency()
 {
 	//Conversion efficiency = photonic electrons after cut / photonic electrons without cut
 	//Here we calculate the conversion efficiency for all possible combinations of reweighting each particle spectrum
-	//There are 60 total combinations, as follows:
-	// ---> 12 pizero histograms, corresponding to combinations of 3 pizero variations x 4 photon variations
-	// ---> Match these 15 combinations to the eta histograms corresponding to the SAME PHOTON (5 total)
-	// This gives 60 combinations
-	// The photonic index is the first one
+	//There are 60 total combinations, labeled by three indices (i, j, k) = (photon, pizero, eta)
 
 	TH1D *h_pT_photonic[NUMFNPS];
 	TH1D *h_pT_photonic_accepted[NUMFNPS];
@@ -332,22 +336,23 @@ void calculateConversionEfficiency()
 	int numHisto = 0;
 	for (int i = 0; i < NVARPHOTONS; i++)
 	{
-		TH1D *h_aux = (TH1D*) h_elec_pT_photons[i]->Clone(Form("h_pT_photonic_%i", numHisto));
-
-		for (int j = 0; j < NHISTPIZEROS; j++)
+		for (int j = 0; j < NVARPIZEROS; j++)
 		{
-			//Get pizero variations corresponding to the photon at hand
-			if (getPhotonVariationPizero(j) != i) continue;
-
-			h_aux->Add(h_elec_pT_pizeros[j]);
-
-			for (int k = 0; k < NHISTETAS; k++)
+			for (int k = 0; k < NVARETAS; k++)
 			{
-				//Get eta variations corresponding to the photon at hand
-				if (getPhotonVariationEta(k) != i) continue;
+				//Scale photonic electron yields to account for relative ratio between pions (etas) and photons
+				float pionScale = getPizeroPhotonRatio(j, i);
+				float etaScale = getEtaPhotonRatio(i, k);
 
-				h_aux->Add(h_elec_pT_etas[k]);
-				h_pT_photonic[numHisto] = (TH1D*) h_aux->Clone();
+				TH1D *h_aux_pizeros = (TH1D*) h_elec_pT_pizeros[j]->Clone(Form("h_aux_pizeros_%i_%i_%i", i, j, k));
+				TH1D *h_aux_etas = (TH1D*) h_elec_pT_etas[k]->Clone(Form("h_aux_etas_%i_%i_%i", i, j, k));
+
+				h_aux_pizeros->Scale(pionScale);
+				h_aux_etas->Scale(etaScale);
+
+				h_pT_photonic[numHisto] = (TH1D*) h_elec_pT_photons[i]->Clone(Form("h_pT_photonic_%i_%i_%i", i, j, k));
+				h_pT_photonic[numHisto]->Add(h_aux_pizeros);
+				h_pT_photonic[numHisto]->Add(h_aux_etas);
 				numHisto++;
 			}
 		}
@@ -356,22 +361,23 @@ void calculateConversionEfficiency()
 	numHisto = 0;
 	for (int i = 0; i < NVARPHOTONS; i++)
 	{
-		TH1D *h_aux = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_pT_photonic_accepted_%i", numHisto));
-
-		for (int j = 0; j < NHISTPIZEROS; j++)
+		for (int j = 0; j < NVARPIZEROS; j++)
 		{
-			//Get pizero variations corresponding to the photon at hand
-			if (getPhotonVariationPizero(j) != i) continue;
-
-			h_aux->Add(h_elec_pT_pizeros_accepted[j]);
-
-			for (int k = 0; k < NHISTETAS; k++)
+			for (int k = 0; k < NVARETAS; k++)
 			{
-				//Get eta variations corresponding to the photon at hand
-				if (getPhotonVariationEta(k) != i) continue;
+				//Scale photonic electron yields to account for relative ratio between pions (etas) and photons
+				float pionScale = getPizeroPhotonRatio(j, i);
+				float etaScale = getEtaPhotonRatio(i, k);
 
-				h_aux->Add(h_elec_pT_etas_accepted[k]);
-				h_pT_photonic_accepted[numHisto] = (TH1D*) h_aux->Clone();
+				TH1D *h_aux_pizeros = (TH1D*) h_elec_pT_pizeros_accepted[j]->Clone(Form("h_aux_pizeros_accepted_%i_%i_%i", i, j, k));
+				TH1D *h_aux_etas = (TH1D*) h_elec_pT_etas_accepted[k]->Clone(Form("h_aux_etas_accepted_%i_%i_%i", i, j, k));
+
+				h_aux_pizeros->Scale(pionScale);
+				h_aux_etas->Scale(etaScale);
+
+				h_pT_photonic_accepted[numHisto] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_pT_photonic_%i_%i_%i", i, j, k));
+				h_pT_photonic_accepted[numHisto]->Add(h_aux_pizeros);
+				h_pT_photonic_accepted[numHisto]->Add(h_aux_etas);
 				numHisto++;
 			}
 		}
@@ -619,20 +625,6 @@ void plotFNP()
 				h_FNP_conv[index]->Draw("same");
 			}
 		}
-		else if (index == 5 || index == 10)
-		{
-			if (effErrors)
-			{
-				cout << index << ": " << h_FNP[index]->GetBinContent(1) << endl;
-				g_eff_FNP[index]->Draw("P,same");
-				g_eff_FNP_conv[index]->Draw("P,same");
-			}
-			else
-			{
-				h_FNP[index]->Draw();
-				h_FNP_conv[index]->Draw("same");
-			}
-		}
 		else
 		{
 			if (effErrors)
@@ -647,6 +639,9 @@ void plotFNP()
 			}
 		}
 	}
+
+	g_eff_FNP[0]->Draw("P,same");
+	g_eff_FNP_conv[0]->Draw("P,same");
 
 	//Plot FNP from template fitting method (May 9 - 2017)
 	float pT15[7] = {1.25, 1.75, 2.25, 2.75, 3.5, 5.0, 7.0};
@@ -764,6 +759,7 @@ void calculateSystematicsFNP()
 {
 	readFiles();
 	rebinHistograms();
+	defineSpectra();
 	calculateSpeciesSurvival();
 	calculateConversionEfficiency();
 	calculateRandomlyKilledEfficiency();
