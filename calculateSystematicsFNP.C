@@ -25,6 +25,10 @@ const int NBINSFNP = 9;
 const int NVARETAS = 5;
 const int NVARPIZEROS = 3;
 const int NVARPHOTONS = 4;
+const int NVARETAPIRATIO = 3;
+
+//Eta pi ratio variations
+float etaPiRatio[NVARETAPIRATIO] = {1.0, 1.083, 0.917};
 
 //Spectra
 TF1 *f_photon_spectrum[NVARPHOTONS];
@@ -32,7 +36,7 @@ TF1 *f_pizero_spectrum[NVARPIZEROS];
 TF1 *f_eta_spectrum[NVARETAS];
 
 //Total evaluated FNPs
-const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS;
+const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS * NVARETAPIRATIO;
 
 //RMS of all systematic variations on FNP
 float rmsFNP[NBINSFNP];
@@ -184,7 +188,7 @@ float getEtaPhotonRatio(int etaIndex, int photonIndex)
 	float etaYield = f_eta_spectrum[etaIndex]->Eval(18.0);
 	float photonYield = f_photon_spectrum[photonIndex]->Eval(18.0);
 
-	return etaYield/photonYield;
+	return etaYield / photonYield;
 }
 
 
@@ -194,7 +198,7 @@ float getPizeroPhotonRatio(int pizeroIndex, int photonIndex)
 	float pizeroYield = f_pizero_spectrum[pizeroIndex]->Eval(18.0);
 	float photonYield = f_photon_spectrum[photonIndex]->Eval(18.0);
 
-	return pizeroYield/photonYield;
+	return pizeroYield / photonYield;
 }
 
 
@@ -340,20 +344,27 @@ void calculateConversionEfficiency()
 		{
 			for (int k = 0; k < NVARETAS; k++)
 			{
-				//Scale photonic electron yields to account for relative ratio between pions (etas) and photons
-				float pionScale = getPizeroPhotonRatio(j, i);
-				float etaScale = getEtaPhotonRatio(i, k);
+				for (int m = 0; m < NVARETAPIRATIO; m++)
+				{
+					//Scale photonic electron yields to account for relative ratio between pions (etas) and photons
+					float pionScale = getPizeroPhotonRatio(j, i);
+					float etaScale = getEtaPhotonRatio(i, k);
 
-				TH1D *h_aux_pizeros = (TH1D*) h_elec_pT_pizeros[j]->Clone(Form("h_aux_pizeros_%i_%i_%i", i, j, k));
-				TH1D *h_aux_etas = (TH1D*) h_elec_pT_etas[k]->Clone(Form("h_aux_etas_%i_%i_%i", i, j, k));
+					//Scale electrons from eta by variation on eta/pizero ratio
+					float etaPiRatioScale = etaPiRatio[m];
 
-				h_aux_pizeros->Scale(pionScale);
-				h_aux_etas->Scale(etaScale);
+					TH1D *h_aux_pizeros = (TH1D*) h_elec_pT_pizeros[j]->Clone(Form("h_aux_pizeros_%i_%i_%i_%i", i, j, k, m));
+					TH1D *h_aux_etas = (TH1D*) h_elec_pT_etas[k]->Clone(Form("h_aux_etas_%i_%i_%i_%i", i, j, k, m));
 
-				h_pT_photonic[numHisto] = (TH1D*) h_elec_pT_photons[i]->Clone(Form("h_pT_photonic_%i_%i_%i", i, j, k));
-				h_pT_photonic[numHisto]->Add(h_aux_pizeros);
-				h_pT_photonic[numHisto]->Add(h_aux_etas);
-				numHisto++;
+					h_aux_pizeros->Scale(pionScale);
+					h_aux_etas->Scale(etaScale);
+					h_aux_etas->Scale(etaPiRatioScale);
+
+					h_pT_photonic[numHisto] = (TH1D*) h_elec_pT_photons[i]->Clone(Form("h_pT_photonic_%i_%i_%i_%i", i, j, k, m));
+					h_pT_photonic[numHisto]->Add(h_aux_pizeros);
+					h_pT_photonic[numHisto]->Add(h_aux_etas);
+					numHisto++;
+				}
 			}
 		}
 	}
@@ -365,20 +376,27 @@ void calculateConversionEfficiency()
 		{
 			for (int k = 0; k < NVARETAS; k++)
 			{
-				//Scale photonic electron yields to account for relative ratio between pions (etas) and photons
-				float pionScale = getPizeroPhotonRatio(j, i);
-				float etaScale = getEtaPhotonRatio(i, k);
+				for (int m = 0; m < NVARETAPIRATIO; m++)
+				{
+					//Scale photonic electron yields to account for relative ratio between pions (etas) and photons
+					float pionScale = getPizeroPhotonRatio(j, i);
+					float etaScale = getEtaPhotonRatio(i, k);
 
-				TH1D *h_aux_pizeros = (TH1D*) h_elec_pT_pizeros_accepted[j]->Clone(Form("h_aux_pizeros_accepted_%i_%i_%i", i, j, k));
-				TH1D *h_aux_etas = (TH1D*) h_elec_pT_etas_accepted[k]->Clone(Form("h_aux_etas_accepted_%i_%i_%i", i, j, k));
+					//Scale electrons from eta by variation on eta/pizero ratio
+					float etaPiRatioScale = etaPiRatio[m];
 
-				h_aux_pizeros->Scale(pionScale);
-				h_aux_etas->Scale(etaScale);
+					TH1D *h_aux_pizeros = (TH1D*) h_elec_pT_pizeros_accepted[j]->Clone(Form("h_aux_pizeros_accepted_%i_%i_%i_%i", i, j, k, m));
+					TH1D *h_aux_etas = (TH1D*) h_elec_pT_etas_accepted[k]->Clone(Form("h_aux_etas_accepted_%i_%i_%i_%i", i, j, k, m));
 
-				h_pT_photonic_accepted[numHisto] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_pT_photonic_%i_%i_%i", i, j, k));
-				h_pT_photonic_accepted[numHisto]->Add(h_aux_pizeros);
-				h_pT_photonic_accepted[numHisto]->Add(h_aux_etas);
-				numHisto++;
+					h_aux_pizeros->Scale(pionScale);
+					h_aux_etas->Scale(etaScale);
+					h_aux_etas->Scale(etaPiRatioScale);
+
+					h_pT_photonic_accepted[numHisto] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_pT_photonic_%i_%i_%i_%i", i, j, k, m));
+					h_pT_photonic_accepted[numHisto]->Add(h_aux_pizeros);
+					h_pT_photonic_accepted[numHisto]->Add(h_aux_etas);
+					numHisto++;
+				}
 			}
 		}
 	}
