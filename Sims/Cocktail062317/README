@@ -1,0 +1,7 @@
+Ana Code:    /offline/analysis/HFAnalysis/IsolationSurivalRate/CalcSurvivalRate
+CVS Version: 1.5, 1.4 (.C. .h)
+
+Notes: - Scale factor set to double, instead of int
+       - Using new set of simulations (2000 x 8000 = 16M events)
+       - Cocktail particles sampled uniformly between [0, 18] GeV/c
+       - New version of ana code saves both reweighted and non-reweighted electrons
