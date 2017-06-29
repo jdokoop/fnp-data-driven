@@ -28,7 +28,7 @@ const int NVARPHOTONS = 4;
 const int NVARETAPIRATIO = 3;
 
 //Eta pi ratio variations
-float etaPiRatio[NVARETAPIRATIO] = {1.0, 1.083, 0.917};
+float etaPiRatio[NVARETAPIRATIO] = {1.04, 0.96, 0.88};
 
 //Spectra
 TF1 *f_photon_spectrum[NVARPHOTONS];
@@ -40,6 +40,9 @@ const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS * NVARETAPIRATIO;
 
 //RMS of all systematic variations on FNP
 float rmsFNP[NBINSFNP];
+
+//TGraph to draw systematics as polygon
+TGraph *g_systematicsRMS;
 
 //Simulated electrons
 TH1D *h_elec_pT_pizeros[NVARPIZEROS];
@@ -509,6 +512,10 @@ void getFNP()
 
 void getRMS()
 {
+	//Display the systematics as a filled polygon
+	float x_syst[NBINSFNP * 2];
+	float y_syst[NBINSFNP * 2];
+
 	//Get the RMS of all systematic variations at every pT point
 	for (int i = 1; i <= NBINSFNP; i++)
 	{
@@ -521,6 +528,25 @@ void getRMS()
 
 		rmsFNP[i - 1] = TMath::RMS(NUMFNPS, values);
 	}
+
+	//Fill TGraph
+	//For a given pT, there will be 2 entries in the TGraph:
+	//Central value \pm RMS
+	for (int i = 1; i <= 2 * NBINSFNP; i++)
+	{
+		x_syst[i - 1] = h_FNP[0]->GetBinCenter((i - 1) % NBINSFNP + 1);
+
+		if (i - 1 < NBINSFNP)
+		{
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP[i - 1];
+		}
+		else
+		{
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP[i - 1];
+		}
+	}
+
+	g_systematicsRMS = new TGraph(2 * NBINSFNP, x_syst, y_syst);
 }
 
 void plotFNP(int index)
@@ -594,6 +620,13 @@ void plotFNP(int index)
 	//legFNP->AddEntry(g_fnp_B0, "Template Fitting Method in B0 - No Veto Cut", "P");
 	legFNP->AddEntry(g_fnp_B1, "F_{NP} From Template Fitting in B1 - No Veto Cut", "PE");
 	legFNP->Draw("same");
+
+	//Systematic error band
+	//g_systematicsRMS->SetLineColor(0); //green
+	//g_systematicsRMS->SetLineWidth(0);
+	//g_systematicsRMS->SetFillColorAlpha(kRed, 0.4); //blue
+	//g_systematicsRMS->Draw("f,same"); //draw with Axis and Fill
+	//g_systematicsRMS->Draw("l,same");  //draw only the contour Line
 }
 
 
