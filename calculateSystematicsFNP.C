@@ -28,7 +28,7 @@ const int NVARPHOTONS = 4;
 const int NVARETAPIRATIO = 3;
 
 //Eta pi ratio variations
-float etaPiRatio[NVARETAPIRATIO] = {1.04, 0.96, 0.88};
+float etaPiRatio[NVARETAPIRATIO] = {0.96, 1.04, 0.88};
 
 //Spectra
 TF1 *f_photon_spectrum[NVARPHOTONS];
@@ -40,6 +40,8 @@ const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS * NVARETAPIRATIO;
 
 //RMS of all systematic variations on FNP
 float rmsFNP[NBINSFNP];
+TH1D *h_rms_plus;
+TH1D *h_rms_minus;
 
 //TGraph to draw systematics as polygon
 TGraph *g_systematicsRMS;
@@ -94,6 +96,10 @@ TH1D *h_P_conv[NUMFNPS];
 TH1D *h_NP_conv[NUMFNPS];
 TH1D *h_FNP_conv[NUMFNPS];
 TGraphAsymmErrors *g_eff_FNP_conv[NUMFNPS];
+
+//Histos to draw the ratio of all systematic variations to the default FNP
+TH1D *h_FNP_default_ratios[NUMFNPS];
+TH1D *h_FNP_conv_default_ratios[NUMFNPS];
 
 //----------------------------------
 // Functions
@@ -337,6 +343,8 @@ void calculateConversionEfficiency()
 	//Here we calculate the conversion efficiency for all possible combinations of reweighting each particle spectrum
 	//There are 60 total combinations, labeled by three indices (i, j, k) = (photon, pizero, eta)
 
+	cout << "********* Indices = (photon, pizero, eta, eta-pi ratio) **********" << endl << endl;
+
 	TH1D *h_pT_photonic[NUMFNPS];
 	TH1D *h_pT_photonic_accepted[NUMFNPS];
 
@@ -366,6 +374,9 @@ void calculateConversionEfficiency()
 					h_pT_photonic[numHisto] = (TH1D*) h_elec_pT_photons[i]->Clone(Form("h_pT_photonic_%i_%i_%i_%i", i, j, k, m));
 					h_pT_photonic[numHisto]->Add(h_aux_pizeros);
 					h_pT_photonic[numHisto]->Add(h_aux_etas);
+
+					cout << numHisto << ": " << i << " " << j << " " << k << " " << m << endl;
+
 					numHisto++;
 				}
 			}
@@ -428,6 +439,29 @@ void getCleanElectronSample()
 
 	h_elec_pT_isolated = (TH1D*) h_elec_pT_accepted->Clone("h_elec_pT_isolated");
 	h_elec_pT_isolated->Add(h_elec_sw_pT_accepted, -1.0);
+}
+
+
+int getPhotonIndex(int index)
+{
+	return index / 45;
+}
+
+
+int getPionIndex(int index)
+{
+	return (index - (index / 45) * 45) / 15;
+}
+
+
+int getEtaIndex(int index)
+{
+	return (index - (index / 15) * 15) / 3;
+}
+
+int getEtaPiRatioIndex(int index)
+{
+	return index % 3;
 }
 
 
@@ -516,17 +550,26 @@ void getRMS()
 	float x_syst[NBINSFNP * 2];
 	float y_syst[NBINSFNP * 2];
 
+	h_rms_plus = (TH1D*) h_FNP[0]->Clone("h_rms_plus");
+	h_rms_minus = (TH1D*) h_FNP[0]->Clone("h_rms_minus");
+
 	//Get the RMS of all systematic variations at every pT point
 	for (int i = 1; i <= NBINSFNP; i++)
 	{
 		float values[NUMFNPS] = {0.0};
+		float valuesRatio[NUMFNPS] = {0.0};
 		for (int j = 0; j < NUMFNPS; j++)
 		{
 			float fnp = h_FNP[j]->GetBinContent(i);
 			values[j] = fnp;
+			valuesRatio[j] = fnp / h_FNP[0]->GetBinContent(i);
 		}
 
 		rmsFNP[i - 1] = TMath::RMS(NUMFNPS, values);
+		float mean = TMath::Mean(NUMFNPS, valuesRatio);
+		float rmsFNPRatio = TMath::RMS(NUMFNPS, valuesRatio);
+		h_rms_plus->SetBinContent(i, mean + rmsFNPRatio);
+		h_rms_minus->SetBinContent(i, mean - rmsFNPRatio);
 	}
 
 	//Fill TGraph
@@ -548,6 +591,32 @@ void getRMS()
 
 	g_systematicsRMS = new TGraph(2 * NBINSFNP, x_syst, y_syst);
 }
+
+
+void getRatiosToDefault()
+{
+	//Take the ratio of each systematic variation to the default FNP
+	for (int i = 0; i < NUMFNPS; i++)
+	{
+		//Without conversion veto
+		h_FNP_default_ratios[i] = (TH1D*) h_FNP[i]->Clone(Form("h_fnp_default_ratio_%i", i));
+		h_FNP_default_ratios[i]->Divide(h_FNP[0]);
+
+		h_FNP_default_ratios[i]->SetMarkerColor(kRed);
+		h_FNP_default_ratios[i]->SetMarkerStyle(2);
+		h_FNP_default_ratios[i]->SetMarkerSize(1.0);
+
+		//With conversion veto
+		h_FNP_conv_default_ratios[i] = (TH1D*) h_FNP_conv[i]->Clone(Form("h_fnp_conv_default_ratio_%i", i));
+		h_FNP_conv_default_ratios[i]->Divide(h_FNP_conv[0]);
+
+		h_FNP_conv_default_ratios[i]->SetMarkerColor(kBlue);
+		h_FNP_conv_default_ratios[i]->SetMarkerStyle(20);
+		h_FNP_conv_default_ratios[i]->SetMarkerSize(0.4);
+	}
+
+}
+
 
 void plotFNP(int index)
 {
@@ -663,7 +732,6 @@ void plotFNP()
 		{
 			if (effErrors)
 			{
-				cout << index << ": " << h_FNP[index]->GetBinContent(1) << endl;
 				g_eff_FNP[index]->SetMarkerColor(kBlack);
 				g_eff_FNP_conv[index]->SetMarkerColor(kBlack);
 
@@ -806,6 +874,94 @@ void saveFiles()
 }
 */
 
+void plotSystematicRatio()
+{
+	TCanvas *cRatio = new TCanvas("cRatio", "Ratio - No Veto Cut", 1000, 600);
+
+	formatHistograms(h_FNP_default_ratios[0], "p_{T} [GeV/c]", "Ratio to Default F_{NP}", "");
+
+	h_rms_minus->SetLineColor(kBlack);
+	h_rms_minus->SetLineWidth(3);
+
+	h_rms_plus->SetLineColor(kBlack);
+	h_rms_plus->SetLineWidth(3);
+
+	h_FNP_default_ratios[0]->Draw("HIST");
+	h_FNP_default_ratios[0]->GetYaxis()->SetRangeUser(0.8, 1.2);
+	h_FNP_default_ratios[0]->SetMarkerColor(kRed);
+	h_FNP_default_ratios[0]->SetLineColor(kRed - 9);
+	h_FNP_default_ratios[0]->SetMarkerStyle(20);
+	h_FNP_default_ratios[0]->SetMarkerSize(0.4);
+
+	for (int i = 1; i < NUMFNPS; i++)
+	{
+		h_FNP_default_ratios[i]->Draw("HIST,same");
+
+		//Set various photon variations in different colors
+		int photonIndex = getPhotonIndex(i);
+		int pionIndex = getPionIndex(i);
+		int etaIndex = getEtaIndex(i);
+
+		/*
+				if (photonIndex == 0)
+				{
+					h_FNP_default_ratios[i]->SetLineColor(kViolet);
+				}
+				else if (photonIndex == 1)
+				{
+					h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
+				}
+				else if(photonIndex == 2)
+				{
+					h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
+				}
+				else
+				{
+					h_FNP_default_ratios[i]->SetLineColor(kAzure + 7);
+				}
+				*/
+
+		/*
+		if (pionIndex == 0)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kViolet);
+		}
+		else if (pionIndex == 1)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
+		}
+		else if(pionIndex == 2)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
+		}
+		*/
+
+		if (etaIndex == 0)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kViolet);
+		}
+		else if (etaIndex == 1)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
+		}
+		else if (etaIndex == 2)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
+		}
+		else if (etaIndex == 3)
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kAzure + 7);
+		}
+		else
+		{
+			h_FNP_default_ratios[i]->SetLineColor(kPink + 10);
+		}
+	}
+
+	h_rms_minus->Draw("hist,same");
+	h_rms_plus->Draw("hist,same");
+}
+
 void calculateSystematicsFNP()
 {
 	readFiles();
@@ -817,6 +973,7 @@ void calculateSystematicsFNP()
 	getCleanElectronSample();
 	getFNP();
 	getRMS();
+	getRatiosToDefault();
 
 	gStyle->SetOptStat(0);
 	gStyle->SetErrorX(0);
@@ -825,5 +982,6 @@ void calculateSystematicsFNP()
 	//plotKilledEfficiency();
 	//plotDataElectrons();
 	plotFNP();
+	plotSystematicRatio();
 	//saveFiles();
 }
