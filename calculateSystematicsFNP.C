@@ -16,6 +16,12 @@ bool effErrors = true;
 float etaPhotonRatio = 1.0;
 float pizeroPhotonRatio = 1.0;
 
+//Which particle variations to group curves by?
+//0: Photon
+//1: Pion
+//2: Eta
+int colorCodeVariation = 0;
+
 //Rebin factor
 const int REBINF = 40;
 
@@ -100,6 +106,9 @@ TGraphAsymmErrors *g_eff_FNP_conv[NUMFNPS];
 //Histos to draw the ratio of all systematic variations to the default FNP
 TH1D *h_FNP_default_ratios[NUMFNPS];
 TH1D *h_FNP_conv_default_ratios[NUMFNPS];
+
+//TBoxes for systematics
+TBox *b_fnp_syst[NBINSFNP];
 
 //----------------------------------
 // Functions
@@ -566,10 +575,13 @@ void getRMS()
 		}
 
 		rmsFNP[i - 1] = TMath::RMS(NUMFNPS, values);
-		float mean = TMath::Mean(NUMFNPS, valuesRatio);
+		float mean = TMath::Mean(NUMFNPS, values);
+		float meanRatio = TMath::Mean(NUMFNPS, valuesRatio);
 		float rmsFNPRatio = TMath::RMS(NUMFNPS, valuesRatio);
-		h_rms_plus->SetBinContent(i, mean + rmsFNPRatio);
-		h_rms_minus->SetBinContent(i, mean - rmsFNPRatio);
+		h_rms_plus->SetBinContent(i, meanRatio + rmsFNPRatio);
+		h_rms_minus->SetBinContent(i, meanRatio - rmsFNPRatio);
+
+		b_fnp_syst[i - 1] = new TBox(h_FNP[0]->GetBinCenter(i) - 0.15, mean - TMath::RMS(NUMFNPS, values), h_FNP[0]->GetBinCenter(i) + 0.15, mean + TMath::RMS(NUMFNPS, values));
 	}
 
 	//Fill TGraph
@@ -732,8 +744,11 @@ void plotFNP()
 		{
 			if (effErrors)
 			{
-				g_eff_FNP[index]->SetMarkerColor(kBlack);
-				g_eff_FNP_conv[index]->SetMarkerColor(kBlack);
+				g_eff_FNP[index]->SetLineColor(kBlue);
+				g_eff_FNP_conv[index]->SetLineColor(kRed);
+
+				g_eff_FNP[index]->SetMarkerColor(kBlue);
+				g_eff_FNP_conv[index]->SetMarkerColor(kRed);
 
 				g_eff_FNP[index]->Draw("AP");
 				g_eff_FNP_conv[index]->Draw("P,same");
@@ -789,10 +804,18 @@ void plotFNP()
 	//g_fnp_B0->Draw("P,same");
 	//g_fnp_B1->Draw("P,same");
 
+	for (int i = 0; i < NBINSFNP; i++)
+	{
+		b_fnp_syst[i]->Draw("same");
+		b_fnp_syst[i]->SetLineColor(kBlue);
+		b_fnp_syst[i]->SetFillStyle(0);
+
+	}
+
 	TLegend *legFNP = new TLegend(0.3, 0.15, 0.85, 0.40);
 	legFNP->SetLineColor(kWhite);
-	legFNP->AddEntry(h_FNP_conv[0], "F_{NP} With Veto Cut", "PE");
-	legFNP->AddEntry(h_FNP[0], "F_{NP} Without Veto Cut", "PE");
+	legFNP->AddEntry(g_eff_FNP_conv[0], "F_{NP} With Veto Cut", "PE");
+	legFNP->AddEntry(g_eff_FNP[0], "F_{NP} Without Veto Cut", "PE");
 	//legFNP->AddEntry(g_fnp_B0, "Template Fitting Method in B0 - No Veto Cut", "P");
 	//legFNP->AddEntry(g_fnp_B1, "F_{NP} From Template Fitting in B1 - No Veto Cut", "PE");
 	legFNP->Draw("same");
@@ -902,59 +925,64 @@ void plotSystematicRatio()
 		int pionIndex = getPionIndex(i);
 		int etaIndex = getEtaIndex(i);
 
-		/*
-				if (photonIndex == 0)
-				{
-					h_FNP_default_ratios[i]->SetLineColor(kViolet);
-				}
-				else if (photonIndex == 1)
-				{
-					h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
-				}
-				else if(photonIndex == 2)
-				{
-					h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
-				}
-				else
-				{
-					h_FNP_default_ratios[i]->SetLineColor(kAzure + 7);
-				}
-				*/
+		if (colorCodeVariation == 0)
+		{
+			if (photonIndex == 0)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kViolet);
+			}
+			else if (photonIndex == 1)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
+			}
+			else if (photonIndex == 2)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
+			}
+			else
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kAzure + 7);
+			}
+		}
 
-		/*
-		if (pionIndex == 0)
+		if (colorCodeVariation == 1)
 		{
-			h_FNP_default_ratios[i]->SetLineColor(kViolet);
+			if (pionIndex == 0)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kViolet);
+			}
+			else if (pionIndex == 1)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
+			}
+			else if (pionIndex == 2)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
+			}
 		}
-		else if (pionIndex == 1)
-		{
-			h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
-		}
-		else if(pionIndex == 2)
-		{
-			h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
-		}
-		*/
 
-		if (etaIndex == 0)
+		if (colorCodeVariation == 2)
 		{
-			h_FNP_default_ratios[i]->SetLineColor(kViolet);
-		}
-		else if (etaIndex == 1)
-		{
-			h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
-		}
-		else if (etaIndex == 2)
-		{
-			h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
-		}
-		else if (etaIndex == 3)
-		{
-			h_FNP_default_ratios[i]->SetLineColor(kAzure + 7);
-		}
-		else
-		{
-			h_FNP_default_ratios[i]->SetLineColor(kPink + 10);
+			if (etaIndex == 0)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kViolet);
+			}
+			else if (etaIndex == 1)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kOrange - 3);
+			}
+			else if (etaIndex == 2)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kSpring - 1);
+			}
+			else if (etaIndex == 3)
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kAzure + 7);
+			}
+			else
+			{
+				h_FNP_default_ratios[i]->SetLineColor(kPink + 10);
+			}
 		}
 	}
 
