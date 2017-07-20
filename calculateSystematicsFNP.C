@@ -46,6 +46,8 @@ const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS * NVARETAPIRATIO;
 
 //RMS of all systematic variations on FNP
 float rmsFNP[NBINSFNP];
+float rmsFNP_asymm_above[NBINSFNP];
+float rmsFNP_asymm_below[NBINSFNP];
 TH1D *h_rms_plus;
 TH1D *h_rms_minus;
 
@@ -553,6 +555,92 @@ void getFNP()
 	}
 }
 
+
+void getAsymmRMS()
+{
+	//Display the systematics as a filled polygon
+	float x_syst[NBINSFNP * 2];
+	float y_syst[NBINSFNP * 2];
+
+	h_rms_plus = (TH1D*) h_FNP[0]->Clone("h_rms_plus");
+	h_rms_minus = (TH1D*) h_FNP[0]->Clone("h_rms_minus");
+
+	//Get the RMS of all systematic variations at every pT point
+	for (int i = 1; i <= NBINSFNP; i++)
+	{
+		//Vectors to store, for every FNP bin, the values of the systematic variations that are above and below the default value of FNP
+		std::vector<float> valuesAbove;
+		std::vector<float> valuesBelow;
+
+		//Array to store, for every FNP bin, the ratio of the systematic variation to the default value
+		float valuesRatio[NUMFNPS] = {0.0};
+		float values[NUMFNPS] = {0.0};
+
+		for (int j = 0; j < NUMFNPS; j++)
+		{
+			float fnpDefault = h_FNP[0]->GetBinContent(i);
+			float fnp = h_FNP[j]->GetBinContent(i);
+
+			if (fnp > fnpDefault)
+			{
+				valuesAbove.push_back(fnp - fnpDefault);
+			}
+			else if (fnp < fnpDefault)
+			{
+				valuesBelow.push_back(fnp - fnpDefault);
+			}
+
+			values[j] = fnp;
+			valuesRatio[j] = fnp / h_FNP[0]->GetBinContent(i);
+		}
+
+		//Calculate RMS for variations above the default
+		rmsFNP_asymm_above[i - 1] = 0.0;
+		for (int k = 0; k < valuesAbove.size(); k++)
+		{
+			if(i == 1) cout << valuesAbove[k] << "," << endl;
+			rmsFNP_asymm_above[i - 1] += valuesAbove[k] * valuesAbove[k];
+		}
+		rmsFNP_asymm_above[i - 1] = TMath::Sqrt((float) rmsFNP_asymm_above[i - 1] / valuesAbove.size());
+
+		//Calculate RMS for variations below the default
+		rmsFNP_asymm_below[i - 1] = 0.0;
+		for (int k = 0; k < valuesBelow.size(); k++)
+		{
+			rmsFNP_asymm_below[i - 1] += valuesBelow[k] * valuesBelow[k];
+		}
+		rmsFNP_asymm_below[i - 1] = TMath::Sqrt((float) rmsFNP_asymm_below[i - 1] / valuesBelow.size());
+
+		float mean = TMath::Mean(NUMFNPS, values);
+		float meanRatio = TMath::Mean(NUMFNPS, valuesRatio);
+		float rmsFNPRatio = TMath::RMS(NUMFNPS, valuesRatio);
+		h_rms_plus->SetBinContent(i, meanRatio + rmsFNPRatio);
+		h_rms_minus->SetBinContent(i, meanRatio - rmsFNPRatio);
+
+		b_fnp_syst[i - 1] = new TBox(h_FNP[0]->GetBinCenter(i) - 0.15, h_FNP[0]->GetBinContent(i) - rmsFNP_asymm_below[i - 1], h_FNP[0]->GetBinCenter(i) + 0.15, h_FNP[0]->GetBinContent(i) + rmsFNP_asymm_above[i - 1]);
+	}
+
+	//Fill TGraph
+	//For a given pT, there will be 2 entries in the TGraph:
+	//Central value \pm RMS
+	for (int i = 1; i <= 2 * NBINSFNP; i++)
+	{
+		x_syst[i - 1] = h_FNP[0]->GetBinCenter((i - 1) % NBINSFNP + 1);
+
+		if (i - 1 < NBINSFNP)
+		{
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP[i - 1];
+		}
+		else
+		{
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP[i - 1];
+		}
+	}
+
+	g_systematicsRMS = new TGraph(2 * NBINSFNP, x_syst, y_syst);
+}
+
+
 void getRMS()
 {
 	//Display the systematics as a filled polygon
@@ -1000,7 +1088,7 @@ void calculateSystematicsFNP()
 	calculateRandomlyKilledEfficiency();
 	getCleanElectronSample();
 	getFNP();
-	getRMS();
+	getAsymmRMS();
 	getRatiosToDefault();
 
 	gStyle->SetOptStat(0);
