@@ -45,14 +45,20 @@ TF1 *f_eta_spectrum[NVARETAS];
 const int NUMFNPS = NVARPIZEROS * NVARPHOTONS * NVARETAS * NVARETAPIRATIO;
 
 //RMS of all systematic variations on FNP
-float rmsFNP[NBINSFNP];
-float rmsFNP_asymm_above[NBINSFNP];
-float rmsFNP_asymm_below[NBINSFNP];
+float rmsFNP_noveto[NBINSFNP];
+float rmsFNP_noveto_asymm_above[NBINSFNP];
+float rmsFNP_noveto_asymm_below[NBINSFNP];
+
+float rmsFNP_veto[NBINSFNP];
+float rmsFNP_veto_asymm_above[NBINSFNP];
+float rmsFNP_veto_asymm_below[NBINSFNP];
+
 TH1D *h_rms_plus;
 TH1D *h_rms_minus;
 
 //TGraph to draw systematics as polygon
-TGraph *g_systematicsRMS;
+TGraph *g_systematicsRMS_noveto;
+TGraph *g_systematicsRMS_veto;
 
 //Simulated electrons
 TH1D *h_elec_pT_pizeros[NVARPIZEROS];
@@ -110,7 +116,8 @@ TH1D *h_FNP_default_ratios[NUMFNPS];
 TH1D *h_FNP_conv_default_ratios[NUMFNPS];
 
 //TBoxes for systematics
-TBox *b_fnp_syst[NBINSFNP];
+TBox *b_fnp_syst_noveto[NBINSFNP];
+TBox *b_fnp_syst_veto[NBINSFNP];
 
 //----------------------------------
 // Functions
@@ -525,7 +532,7 @@ void getFNP()
 			g_eff_FNP[i]->SetPointError(j, 0.0, 0.0, g_eff_FNP[i]->GetErrorYlow(j), g_eff_FNP[i]->GetErrorYhigh(j));
 		}
 
-		//Calculate FNP with the conversion verto by multiplying NP by the randomly killer
+		//Calculate FNP with the conversion verto by multiplying NP by the randomly killed
 		//effiency, and P by the isolation cut efficiency and randomly killed efficiency
 		//Then, FNP = e_r*NP / (e_r*NP + e_r*e_i*P)
 		TH1D *h_aux6 = (TH1D*) h_NP[i]->Clone("h_aux6");
@@ -558,6 +565,10 @@ void getFNP()
 
 void getAsymmRMS()
 {
+	//----------------------------------------------------------------
+	// RMS Calculation for FNP Without Veto Cut
+	//----------------------------------------------------------------
+
 	//Display the systematics as a filled polygon
 	float x_syst[NBINSFNP * 2];
 	float y_syst[NBINSFNP * 2];
@@ -595,29 +606,28 @@ void getAsymmRMS()
 		}
 
 		//Calculate RMS for variations above the default
-		rmsFNP_asymm_above[i - 1] = 0.0;
+		rmsFNP_noveto_asymm_above[i - 1] = 0.0;
 		for (int k = 0; k < valuesAbove.size(); k++)
 		{
-			if(i == 1) cout << valuesAbove[k] << "," << endl;
-			rmsFNP_asymm_above[i - 1] += valuesAbove[k] * valuesAbove[k];
+			rmsFNP_noveto_asymm_above[i - 1] += valuesAbove[k] * valuesAbove[k];
 		}
-		rmsFNP_asymm_above[i - 1] = TMath::Sqrt((float) rmsFNP_asymm_above[i - 1] / valuesAbove.size());
+		rmsFNP_noveto_asymm_above[i - 1] = TMath::Sqrt((float) rmsFNP_noveto_asymm_above[i - 1] / valuesAbove.size());
 
 		//Calculate RMS for variations below the default
-		rmsFNP_asymm_below[i - 1] = 0.0;
+		rmsFNP_noveto_asymm_below[i - 1] = 0.0;
 		for (int k = 0; k < valuesBelow.size(); k++)
 		{
-			rmsFNP_asymm_below[i - 1] += valuesBelow[k] * valuesBelow[k];
+			rmsFNP_noveto_asymm_below[i - 1] += valuesBelow[k] * valuesBelow[k];
 		}
-		rmsFNP_asymm_below[i - 1] = TMath::Sqrt((float) rmsFNP_asymm_below[i - 1] / valuesBelow.size());
+		rmsFNP_noveto_asymm_below[i - 1] = TMath::Sqrt((float) rmsFNP_noveto_asymm_below[i - 1] / valuesBelow.size());
 
 		float mean = TMath::Mean(NUMFNPS, values);
 		float meanRatio = TMath::Mean(NUMFNPS, valuesRatio);
-		float rmsFNPRatio = TMath::RMS(NUMFNPS, valuesRatio);
-		h_rms_plus->SetBinContent(i, meanRatio + rmsFNPRatio);
-		h_rms_minus->SetBinContent(i, meanRatio - rmsFNPRatio);
+		float rmsFNP_novetoRatio = TMath::RMS(NUMFNPS, valuesRatio);
+		h_rms_plus->SetBinContent(i, meanRatio + rmsFNP_novetoRatio);
+		h_rms_minus->SetBinContent(i, meanRatio - rmsFNP_novetoRatio);
 
-		b_fnp_syst[i - 1] = new TBox(h_FNP[0]->GetBinCenter(i) - 0.15, h_FNP[0]->GetBinContent(i) - rmsFNP_asymm_below[i - 1], h_FNP[0]->GetBinCenter(i) + 0.15, h_FNP[0]->GetBinContent(i) + rmsFNP_asymm_above[i - 1]);
+		b_fnp_syst_noveto[i - 1] = new TBox(h_FNP[0]->GetBinCenter(i) - 0.15, h_FNP[0]->GetBinContent(i) - rmsFNP_noveto_asymm_below[i - 1], h_FNP[0]->GetBinCenter(i) + 0.15, h_FNP[0]->GetBinContent(i) + rmsFNP_noveto_asymm_above[i - 1]);
 	}
 
 	//Fill TGraph
@@ -629,15 +639,95 @@ void getAsymmRMS()
 
 		if (i - 1 < NBINSFNP)
 		{
-			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP[i - 1];
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP_noveto[i - 1];
 		}
 		else
 		{
-			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP[i - 1];
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP_noveto[i - 1];
 		}
 	}
 
-	g_systematicsRMS = new TGraph(2 * NBINSFNP, x_syst, y_syst);
+	g_systematicsRMS_noveto = new TGraph(2 * NBINSFNP, x_syst, y_syst);
+
+
+	//----------------------------------------------------------------
+	// RMS Calculation for FNP With Veto Cut
+	//----------------------------------------------------------------
+
+	//Display the systematics as a filled polygon
+	float x_syst_veto[NBINSFNP * 2];
+	float y_syst_veto[NBINSFNP * 2];
+
+	//Get the RMS of all systematic variations at every pT point
+	for (int i = 1; i <= NBINSFNP; i++)
+	{
+		//Vectors to store, for every FNP bin, the values of the systematic variations that are above and below the default value of FNP
+		std::vector<float> valuesAbove;
+		std::vector<float> valuesBelow;
+
+		//Array to store, for every FNP bin, the ratio of the systematic variation to the default value
+		float valuesRatio[NUMFNPS] = {0.0};
+		float values[NUMFNPS] = {0.0};
+
+		for (int j = 0; j < NUMFNPS; j++)
+		{
+			float fnpDefault = h_FNP_conv[0]->GetBinContent(i);
+			float fnp = h_FNP_conv[j]->GetBinContent(i);
+
+			if (fnp > fnpDefault)
+			{
+				valuesAbove.push_back(fnp - fnpDefault);
+			}
+			else if (fnp < fnpDefault)
+			{
+				valuesBelow.push_back(fnp - fnpDefault);
+			}
+
+			values[j] = fnp;
+			valuesRatio[j] = fnp / h_FNP[0]->GetBinContent(i);
+		}
+
+		//Calculate RMS for variations above the default
+		rmsFNP_veto_asymm_above[i - 1] = 0.0;
+		for (int k = 0; k < valuesAbove.size(); k++)
+		{
+			rmsFNP_veto_asymm_above[i - 1] += valuesAbove[k] * valuesAbove[k];
+		}
+		rmsFNP_veto_asymm_above[i - 1] = TMath::Sqrt((float) rmsFNP_noveto_asymm_above[i - 1] / valuesAbove.size());
+
+		//Calculate RMS for variations below the default
+		rmsFNP_veto_asymm_below[i - 1] = 0.0;
+		for (int k = 0; k < valuesBelow.size(); k++)
+		{
+			rmsFNP_veto_asymm_below[i - 1] += valuesBelow[k] * valuesBelow[k];
+		}
+		rmsFNP_veto_asymm_below[i - 1] = TMath::Sqrt((float) rmsFNP_veto_asymm_below[i - 1] / valuesBelow.size());
+
+		float mean = TMath::Mean(NUMFNPS, values);
+		float meanRatio = TMath::Mean(NUMFNPS, valuesRatio);
+		float rmsFNP_vetoRatio = TMath::RMS(NUMFNPS, valuesRatio);
+
+		b_fnp_syst_veto[i - 1] = new TBox(h_FNP_conv[0]->GetBinCenter(i) - 0.15, h_FNP_conv[0]->GetBinContent(i) - rmsFNP_veto_asymm_below[i - 1], h_FNP_conv[0]->GetBinCenter(i) + 0.15, h_FNP_conv[0]->GetBinContent(i) + rmsFNP_veto_asymm_above[i - 1]);
+	}
+
+	//Fill TGraph
+	//For a given pT, there will be 2 entries in the TGraph:
+	//Central value \pm RMS
+	for (int i = 1; i <= 2 * NBINSFNP; i++)
+	{
+		x_syst_veto[i - 1] = h_FNP[0]->GetBinCenter((i - 1) % NBINSFNP + 1);
+
+		if (i - 1 < NBINSFNP)
+		{
+			y_syst_veto[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP_noveto[i - 1];
+		}
+		else
+		{
+			y_syst_veto[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP_noveto[i - 1];
+		}
+	}
+
+	g_systematicsRMS_noveto = new TGraph(2 * NBINSFNP, x_syst_veto, y_syst_veto);
 }
 
 
@@ -662,14 +752,14 @@ void getRMS()
 			valuesRatio[j] = fnp / h_FNP[0]->GetBinContent(i);
 		}
 
-		rmsFNP[i - 1] = TMath::RMS(NUMFNPS, values);
+		rmsFNP_noveto[i - 1] = TMath::RMS(NUMFNPS, values);
 		float mean = TMath::Mean(NUMFNPS, values);
 		float meanRatio = TMath::Mean(NUMFNPS, valuesRatio);
-		float rmsFNPRatio = TMath::RMS(NUMFNPS, valuesRatio);
-		h_rms_plus->SetBinContent(i, meanRatio + rmsFNPRatio);
-		h_rms_minus->SetBinContent(i, meanRatio - rmsFNPRatio);
+		float rmsFNP_novetoRatio = TMath::RMS(NUMFNPS, valuesRatio);
+		h_rms_plus->SetBinContent(i, meanRatio + rmsFNP_novetoRatio);
+		h_rms_minus->SetBinContent(i, meanRatio - rmsFNP_novetoRatio);
 
-		b_fnp_syst[i - 1] = new TBox(h_FNP[0]->GetBinCenter(i) - 0.15, mean - TMath::RMS(NUMFNPS, values), h_FNP[0]->GetBinCenter(i) + 0.15, mean + TMath::RMS(NUMFNPS, values));
+		b_fnp_syst_noveto[i - 1] = new TBox(h_FNP[0]->GetBinCenter(i) - 0.15, mean - TMath::RMS(NUMFNPS, values), h_FNP[0]->GetBinCenter(i) + 0.15, mean + TMath::RMS(NUMFNPS, values));
 	}
 
 	//Fill TGraph
@@ -681,15 +771,15 @@ void getRMS()
 
 		if (i - 1 < NBINSFNP)
 		{
-			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP[i - 1];
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) + rmsFNP_noveto[i - 1];
 		}
 		else
 		{
-			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP[i - 1];
+			y_syst[i - 1] = h_FNP[0]->GetBinContent((i - 1) % NBINSFNP + 1) - rmsFNP_noveto[i - 1];
 		}
 	}
 
-	g_systematicsRMS = new TGraph(2 * NBINSFNP, x_syst, y_syst);
+	g_systematicsRMS_noveto = new TGraph(2 * NBINSFNP, x_syst, y_syst);
 }
 
 
@@ -791,11 +881,11 @@ void plotFNP(int index)
 	legFNP->Draw("same");
 
 	//Systematic error band
-	//g_systematicsRMS->SetLineColor(0); //green
-	//g_systematicsRMS->SetLineWidth(0);
-	//g_systematicsRMS->SetFillColorAlpha(kRed, 0.4); //blue
-	//g_systematicsRMS->Draw("f,same"); //draw with Axis and Fill
-	//g_systematicsRMS->Draw("l,same");  //draw only the contour Line
+	//g_systematicsRMS_noveto->SetLineColor(0); //green
+	//g_systematicsRMS_noveto->SetLineWidth(0);
+	//g_systematicsRMS_noveto->SetFillColorAlpha(kRed, 0.4); //blue
+	//g_systematicsRMS_noveto->Draw("f,same"); //draw with Axis and Fill
+	//g_systematicsRMS_noveto->Draw("l,same");  //draw only the contour Line
 }
 
 
@@ -894,10 +984,16 @@ void plotFNP()
 
 	for (int i = 0; i < NBINSFNP; i++)
 	{
-		b_fnp_syst[i]->Draw("same");
-		b_fnp_syst[i]->SetLineColor(kBlue);
-		b_fnp_syst[i]->SetFillStyle(0);
+		b_fnp_syst_noveto[i]->Draw("same");
+		b_fnp_syst_noveto[i]->SetLineColor(kBlue);
+		b_fnp_syst_noveto[i]->SetFillStyle(0);
+	}
 
+	for (int i = 0; i < NBINSFNP; i++)
+	{
+		b_fnp_syst_veto[i]->Draw("same");
+		b_fnp_syst_veto[i]->SetLineColor(kRed);
+		b_fnp_syst_veto[i]->SetFillStyle(0);
 	}
 
 	TLegend *legFNP = new TLegend(0.3, 0.15, 0.85, 0.40);
@@ -1003,6 +1099,11 @@ void plotSystematicRatio()
 	h_FNP_default_ratios[0]->SetLineColor(kRed - 9);
 	h_FNP_default_ratios[0]->SetMarkerStyle(20);
 	h_FNP_default_ratios[0]->SetMarkerSize(0.4);
+
+	TLegend *legRatio = new TLegend(0.3, 0.15, 0.85, 0.40);
+	legRatio->SetLineColor(kWhite);
+
+	legRatio->Draw("same");
 
 	for (int i = 1; i < NUMFNPS; i++)
 	{
