@@ -118,6 +118,10 @@ TH1D *h_killed_efficiency;
 //RCP -- Ratio of conversion to photonic (Dalitz + Conversion) electrons passing veto cut
 TH1D *h_RCP[NUMFNPS];
 
+//Normalization factors for conversions and Dalitz
+TH1D *h_normalization_conv;
+TH1D *h_normalization_dalitz;
+
 //FNP
 TH1D *h_P[NUMFNPS];
 TH1D *h_NP[NUMFNPS];
@@ -584,6 +588,29 @@ int getEtaPiRatioIndex(int index)
 }
 
 
+void getNormalizationFactors()
+{
+	//Get the normalization factors from RCP and FNP as follows
+	// --> Conversions: (1-FNP) x RCP
+	// --> Dalitz: (1 - FNP) x (1 - RCP)
+
+	h_normalization_dalitz = (TH1D*) h_RCP[0]->Clone("h_normalization_dalitz");
+	h_normalization_conv = (TH1D*) h_RCP[0]->Clone("h_normalization_conv");
+
+	for (int i = 1; i <= h_normalization_conv->GetNbinsX(); i++)
+	{
+		float normFactor = h_normalization_conv->GetBinContent(i) * (1.0 - h_FNP_conv[0]->GetBinContent(i));
+		h_normalization_conv->SetBinContent(i, normFactor);
+	}
+
+	for (int i = 1; i <= h_normalization_dalitz->GetNbinsX(); i++)
+	{
+		float normFactor = (1.0 - h_normalization_dalitz->GetBinContent(i)) * (1.0 - h_FNP_conv[0]->GetBinContent(i));
+		h_normalization_dalitz->SetBinContent(i, normFactor);
+	}
+}
+
+
 void getFNP()
 {
 	for (int i = 0; i < NUMFNPS; i++)
@@ -1006,6 +1033,28 @@ void plotFNP(int index)
 }
 
 
+void plotNormalization()
+{
+	TCanvas *cNorm = new TCanvas("cNorm", "cNorm", 600, 600);
+
+	h_normalization_dalitz->SetMarkerColor(kBlue);
+	h_normalization_dalitz->SetLineColor(kBlue);
+	h_normalization_dalitz->SetMarkerStyle(20);
+	h_normalization_dalitz->SetMarkerSize(0.8);
+
+	h_normalization_conv->SetMarkerColor(kRed);
+	h_normalization_conv->SetLineColor(kRed);
+	h_normalization_conv->SetMarkerStyle(20);
+	h_normalization_conv->SetMarkerSize(0.8);
+
+	formatHistograms(h_normalization_dalitz, "p_{T} [GeV/c]", "Photonic Normalization Factor", " ");
+	h_normalization_dalitz->GetYaxis()->SetRangeUser(0, 0.5);
+
+	h_normalization_dalitz->Draw("P");
+	h_normalization_conv->Draw("P,same");
+}
+
+
 void plotRCP()
 {
 	TCanvas *cRNP = new TCanvas("cRNP", "cRNP", 600, 600);
@@ -1016,7 +1065,7 @@ void plotRCP()
 	h_RCP[0]->SetMarkerSize(0.8);
 
 	formatHistograms(h_RCP[0], "p_{T} [GeV/c]", "R_{CP}", " ");
-	h_RCP[0]->GetYaxis()->SetRangeUser(0,1);
+	h_RCP[0]->GetYaxis()->SetRangeUser(0, 1);
 
 	h_RCP[0]->Draw("P");
 }
@@ -1363,6 +1412,7 @@ void calculateSystematicsFNP()
 	getFNP();
 	getAsymmRMS();
 	getRatiosToDefault();
+	getNormalizationFactors();
 	fitFNP();
 
 	gStyle->SetOptStat(0);
@@ -1373,6 +1423,7 @@ void calculateSystematicsFNP()
 	//plotDataElectrons();
 	plotFNP();
 	plotRCP();
+	plotNormalization();
 	plotSystematicRatio();
 	//saveFiles();
 }
