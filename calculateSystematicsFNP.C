@@ -142,6 +142,18 @@ TH1D *h_FNP_conv_default_ratios[NUMFNPS];
 TBox *b_fnp_syst_noveto[NBINSFNP];
 TBox *b_fnp_syst_veto[NBINSFNP];
 
+//Histograms and TGraphs for non-photonic normalization
+TH1D *h_pT_ke3;
+TH1D *h_pT_jpsi;
+TH1D *h_pT_hf;
+
+TF1 *f_hf_fit;
+
+TGraphErrors *g_pT_hf_ppg077;
+
+TH1D *h_norm_jpsi;
+TH1D *h_norm_ke3;
+
 //----------------------------------
 // Functions
 //----------------------------------
@@ -184,6 +196,165 @@ void formatGraphs(TGraphAsymmErrors *& h, string xTitle, string yTitle, string t
 	h->SetMarkerSize(0.6);
 	h->SetMarkerColor(kAzure + 2);
 	h->SetLineColor(kAzure + 2);
+}
+
+void readCocktailFiles()
+{
+	//Get the Ke3 and J/Psi spectrum from Alan's cocktail from Run5
+	TFile *fin = new TFile("cocktail_10M_pp200_run5_with_jpsi_ups_cent.root");
+	h_pT_ke3   = (TH1D*) fin->Get("pteKe3");
+	h_pT_jpsi  = (TH1D*) fin->Get("pteJPsi");
+}
+
+
+void createHFgraph()
+{
+	//Data from tables in published version of PPG077
+
+	float pT[28] = {0.35,
+	                0.45,
+	                0.55,
+	                0.65,
+	                0.75,
+	                0.85,
+	                0.95,
+	                1.10,
+	                1.30,
+	                1.50,
+	                1.70,
+	                1.90,
+	                2.10,
+	                2.30,
+	                2.50,
+	                2.70,
+	                2.90,
+	                3.10,
+	                3.30,
+	                3.50,
+	                3.70,
+	                3.90,
+	                4.25,
+	                4.75,
+	                5.50,
+	                6.50,
+	                7.50,
+	                8.50
+	               };
+
+	float yield[28] = {1.36E-2,
+	                   6.05E-3,
+	                   3.36E-3,
+	                   1.81E-3,
+	                   1.30E-3,
+	                   7.50E-4,
+	                   5.61E-4,
+	                   3.18E-4,
+	                   1.26E-4,
+	                   6.58E-5,
+	                   3.83E-5,
+	                   1.89E-5,
+	                   1.04E-5,
+	                   6.08E-6,
+	                   3.42E-6,
+	                   2.06E-6,
+	                   1.40E-6,
+	                   8.64E-7,
+	                   5.91E-7,
+	                   4.11E-7,
+	                   2.83E-7,
+	                   1.91E-7,
+	                   1.08E-7,
+	                   4.84E-8,
+	                   1.59E-8,
+	                   5.30E-9,
+	                   1.27E-9,
+	                   8.19E-10
+	                  };
+
+	float errx[28] = {0.0};
+
+	float erry[28] = {4.45E-3,
+	                  1.70E-3,
+	                  7.56E-4,
+	                  3.98E-4,
+	                  2.28E-4,
+	                  1.35E-4,
+	                  9.14E-5,
+	                  3.77E-5,
+	                  2.10E-5,
+	                  1.25E-5,
+	                  2.07E-6,
+	                  1.18E-6,
+	                  7.44E-7,
+	                  4.96E-7,
+	                  3.63E-7,
+	                  6.49E-8,
+	                  4.77E-8,
+	                  3.53E-8,
+	                  2.73E-8,
+	                  2.15E-8,
+	                  1.70E-8,
+	                  1.36E-8,
+	                  5.95E-9,
+	                  3.73E-9,
+	                  1.79E-9,
+	                  9.26E-10,
+	                  5.73E-10,
+	                  5.16E-10
+	                 };
+
+	g_pT_hf_ppg077 = new TGraphErrors(28, pT, yield, errx, erry);
+}
+
+
+void fitHFgraph()
+{
+	//Fit the HF electron yield from PPG077 with a modified Hagedorn function
+	f_hf_fit = new TF1("f_hf_fit", "[0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])", 0.0, 8.5);
+	f_hf_fit->SetParameters(0.0397086, 6.80332e-01, -1.93544e-02, 6.76802e-01, 7.22179e+00);
+	g_pT_hf_ppg077->Fit(f_hf_fit, "Q0R");
+
+	//Use TGraph to fill histogram with the same binning as for J/psi and Ke3
+	h_pT_hf = (TH1D*) h_pT_jpsi->Clone("h_pT_hf");
+	h_pT_hf->Clear();
+
+	for (int i = 1; i <= h_pT_hf->GetNbinsX(); i++)
+	{
+		float pTcenter = h_pT_hf->GetBinCenter(i);
+		float yield = g_pT_hf_ppg077->Eval(pTcenter);
+
+		h_pT_hf->SetBinContent(i, yield);
+	}
+}
+
+
+void getNonPhotonicNormalizationFactors()
+{
+	//First, add up contributions from all NP sources
+	TH1D *h_pt_np = (TH1D*) h_pT_jpsi->Clone("h_pt_np");
+	h_pt_np->Add(h_pT_ke3);
+	h_pt_np->Add(h_pT_hf);
+
+	//Now, compute normalization factors using FNP
+	h_norm_ke3 = (TH1D*) h_pT_ke3->Clone("h_norm_ke3");
+	h_norm_jpsi = (TH1D*) h_pT_jpsi->Clone("h_norm_jpsi");
+
+	h_norm_ke3->Divide(h_pt_np);
+	h_norm_jpsi->Divide(h_pt_np);
+
+	for (int i = 1; i <= h_norm_ke3->GetNbinsX(); i++)
+	{
+		float pT = h_norm_ke3->GetBinCenter(i);
+		float norm_ke3 = h_norm_ke3->GetBinContent(i);
+		norm_ke3 = norm_ke3 * f_fnp_fit_with_veto->Eval(pT);
+		h_norm_ke3->SetBinContent(i, norm_ke3);
+		h_norm_ke3->SetBinError(i, h_norm_ke3->GetBinError(i) * f_fnp_fit_with_veto->Eval(pT));
+
+		float norm_jpsi = h_norm_jpsi->GetBinContent(i);
+		norm_jpsi = norm_jpsi * f_fnp_fit_with_veto->Eval(pT);
+		h_norm_jpsi->SetBinContent(i, norm_jpsi);
+		h_norm_jpsi->SetBinError(i, h_norm_jpsi->GetBinError(i)* f_fnp_fit_with_veto->Eval(pT));
+	}
 }
 
 
@@ -588,7 +759,7 @@ int getEtaPiRatioIndex(int index)
 }
 
 
-void getNormalizationFactors()
+void getPhotonicNormalizationFactors()
 {
 	//Get the normalization factors from RCP and FNP as follows
 	// --> Conversions: (1-FNP) x RCP
@@ -1035,7 +1206,8 @@ void plotFNP(int index)
 
 void plotNormalization()
 {
-	TCanvas *cNorm = new TCanvas("cNorm", "cNorm", 600, 600);
+	//Photonic normalization
+	TCanvas *cPhotonicNorm = new TCanvas("cPhotonicNorm", "cPhotonicNorm", 600, 600);
 
 	h_normalization_dalitz->SetMarkerColor(kBlue);
 	h_normalization_dalitz->SetLineColor(kBlue);
@@ -1045,13 +1217,32 @@ void plotNormalization()
 	h_normalization_conv->SetMarkerColor(kRed);
 	h_normalization_conv->SetLineColor(kRed);
 	h_normalization_conv->SetMarkerStyle(20);
-	h_normalization_conv->SetMarkerSize(0.8);
+	h_normalization_conv->SetMarkerSize(0.6);
 
 	formatHistograms(h_normalization_dalitz, "p_{T} [GeV/c]", "Photonic Normalization Factor", " ");
 	h_normalization_dalitz->GetYaxis()->SetRangeUser(0, 0.5);
 
 	h_normalization_dalitz->Draw("P");
 	h_normalization_conv->Draw("P,same");
+
+	//Non-photonic normalization
+	TCanvas *cNonPhotonicNorm = new TCanvas("cNonPhotonicNorm", "cNonPhotonicNorm", 600, 600);
+
+	h_norm_ke3->SetMarkerColor(kBlue);
+	h_norm_ke3->SetLineColor(kBlue);
+	h_norm_ke3->SetMarkerStyle(20);
+	h_norm_ke3->SetMarkerSize(0.8);
+
+	h_norm_jpsi->SetMarkerColor(kRed);
+	h_norm_jpsi->SetLineColor(kRed);
+	h_norm_jpsi->SetMarkerStyle(20);
+	h_norm_jpsi->SetMarkerSize(0.6);
+
+	formatHistograms(h_norm_ke3, "p_{T} [GeV/c]", "Non-Photonic Normalization Factor", " ");
+	h_norm_ke3->GetYaxis()->SetRangeUser(0, 1.0);
+
+	h_norm_ke3->Draw("P");
+	h_norm_jpsi->Draw("P,same");
 }
 
 
@@ -1412,8 +1603,14 @@ void calculateSystematicsFNP()
 	getFNP();
 	getAsymmRMS();
 	getRatiosToDefault();
-	getNormalizationFactors();
+	getPhotonicNormalizationFactors();
 	fitFNP();
+
+	//Calculate NP normalization
+	readCocktailFiles();
+	createHFgraph();
+	fitHFgraph();
+	getNonPhotonicNormalizationFactors();
 
 	gStyle->SetOptStat(0);
 	gStyle->SetErrorX(0);
