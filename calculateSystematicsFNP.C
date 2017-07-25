@@ -146,6 +146,7 @@ TBox *b_fnp_syst_veto[NBINSFNP];
 TH1D *h_pT_ke3;
 TH1D *h_pT_jpsi;
 TH1D *h_pT_hf;
+TH1D *h_pT_np;
 
 TF1 *f_hf_fit;
 
@@ -310,37 +311,136 @@ void createHFgraph()
 void fitHFgraph()
 {
 	//Fit the HF electron yield from PPG077 with a modified Hagedorn function
-	f_hf_fit = new TF1("f_hf_fit", "[0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])", 0.0, 8.5);
-	f_hf_fit->SetParameters(0.0397086, 6.80332e-01, -1.93544e-02, 6.76802e-01, 7.22179e+00);
+	f_hf_fit = new TF1("f_hf_fit", "[0]/TMath::Power((TMath::Exp(-[1]*x-[2]*x*x)+(x/[3])),[4])", 0.0, 10.0);
+	//f_hf_fit->SetParameters(0.0397086, 6.80332e-01, -1.93544e-02, 6.76802e-01, 7.22179e+00);
+	f_hf_fit->SetParameter(0, 4.41211e-02);
+	f_hf_fit->SetParameter(1, 0.96);
+	f_hf_fit->SetParameter(2, -9.56027e-02);
+	f_hf_fit->SetParameter(3, 7.10173e-01);
+	f_hf_fit->SetParameter(4, 7.11577e+00);
+
 	g_pT_hf_ppg077->Fit(f_hf_fit, "Q0R");
 
 	//Use TGraph to fill histogram with the same binning as for J/psi and Ke3
 	h_pT_hf = (TH1D*) h_pT_jpsi->Clone("h_pT_hf");
-	h_pT_hf->Clear();
+	h_pT_hf->Reset();
 
 	for (int i = 1; i <= h_pT_hf->GetNbinsX(); i++)
 	{
 		float pTcenter = h_pT_hf->GetBinCenter(i);
-		float yield = g_pT_hf_ppg077->Eval(pTcenter);
+		float yield = f_hf_fit->Eval(pTcenter);
 
 		h_pT_hf->SetBinContent(i, yield);
 	}
+
+	//Plot fit and ratio
+	TCanvas *cNP = new TCanvas("cNP", "Stacked Representation of Fit", 700, 900);
+	TPad *pad1 = new TPad("pad1", "pad1", 0, 0.3, 1, 1);
+	pad1->SetLogy();
+	pad1->SetTickx();
+	pad1->SetTicky();
+	pad1->SetBottomMargin(0);
+	pad1->Draw();
+	pad1->cd();
+
+	TH1F *hTemplate2 = new TH1F("hTemplate2", "hTemplate2", 100, 0, 20);
+	hTemplate2->SetTitle("");
+	hTemplate2->GetXaxis()->SetTitleFont(62);
+	hTemplate2->GetXaxis()->SetLabelFont(62);
+	hTemplate2->GetXaxis()->SetRangeUser(0, 10);
+	hTemplate2->GetYaxis()->SetTitleFont(62);
+	hTemplate2->GetYaxis()->SetLabelFont(62);
+	hTemplate2->GetXaxis()->SetTitle("p_{T} [GeV/c]");
+	hTemplate2->GetYaxis()->SetTitle("dN/dp_{T}");
+	hTemplate2->GetYaxis()->SetTitleOffset(1.3);
+	hTemplate2->GetYaxis()->SetRangeUser(1e-10, 1E-1);
+	hTemplate2->Draw();
+
+	g_pT_hf_ppg077->SetTitle("");
+	g_pT_hf_ppg077->GetXaxis()->SetTitleFont(62);
+	g_pT_hf_ppg077->GetXaxis()->SetLabelFont(62);
+	g_pT_hf_ppg077->GetXaxis()->SetRangeUser(0, 10);
+	g_pT_hf_ppg077->GetYaxis()->SetTitleFont(62);
+	g_pT_hf_ppg077->GetYaxis()->SetLabelFont(62);
+	g_pT_hf_ppg077->GetXaxis()->SetTitle("p_{T} [GeV/c]");
+	g_pT_hf_ppg077->GetYaxis()->SetTitle("dN/dp_{T}");
+	g_pT_hf_ppg077->GetYaxis()->SetRangeUser(1e-10, 1E-1);
+	g_pT_hf_ppg077->SetMarkerStyle(20);
+	g_pT_hf_ppg077->SetMarkerSize(0.8);
+	g_pT_hf_ppg077->SetMarkerColor(kBlack);
+	g_pT_hf_ppg077->Draw("P,same");
+	f_hf_fit->Draw("same");
+	
+	TLatex latex;
+	latex.SetNDC();
+	latex.SetTextSize(0.025);
+	latex.DrawLatex(.15, .85, "PHENIX HF Electron Spectrum in p+p");
+	latex.DrawLatex(.15, .82, "PPG077");
+
+	/*
+	TLegend *legend = new TLegend(0.45, 0.45, 0.88, 0.65);
+	legend->AddEntry(f_published_spectrum_fit_extrapolated_npf, "Fit to Spectrum", "l");
+	legend->AddEntry(f_spectrum_fit_var1_extrapolated_npf, "Variation 1: Clockwise Tilt", "l");
+	legend->AddEntry(f_spectrum_fit_var2_extrapolated_npf, "Variation 2: Counterclockwise Tilt", "l");
+	legend->SetFillStyle(0.0);
+	legend->SetLineColor(kWhite);
+	legend->Draw("same");
+	*/
+
+	cNP->cd();
+	TPad *pad2 = new TPad("pad2", "pad2", 0, 0, 1, 0.3);
+	pad2->SetTopMargin(0);
+	pad2->SetBottomMargin(0.3);
+	pad2->Draw();
+	pad2->cd();
+	pad2->SetTickx();
+	pad2->SetTicky();
+
+	//Create ratio
+	TH1D *h_ratio = (TH1D*) h_pT_hf->Clone("h_ratio");
+	for(int i=0; i < g_pT_hf_ppg077->GetN(); i++)
+	{
+		double pT, gval;
+		g_pT_hf_ppg077->GetPoint(i, pT, gval);
+		h_ratio->SetBinContent(i+1, gval/f_hf_fit->Eval(pT));
+	}
+
+	h_ratio->SetMarkerStyle(7);
+	h_ratio->GetXaxis()->SetTitleFont(62);
+	h_ratio->GetXaxis()->SetLabelFont(62);
+	h_ratio->GetXaxis()->SetRangeUser(0, 10);
+	h_ratio->GetYaxis()->SetTitleFont(62);
+	h_ratio->GetYaxis()->SetLabelFont(62);
+	h_ratio->SetTitle("");
+	h_ratio->GetYaxis()->CenterTitle();
+	h_ratio->GetYaxis()->SetRangeUser(0.7, 1.28);
+	h_ratio->GetXaxis()->SetTitle("p_{T} [GeV/c]");
+	h_ratio->GetYaxis()->SetTitle("Data / Fit");
+	h_ratio->GetYaxis()->SetTitleSize(0.085);
+	h_ratio->GetYaxis()->SetTitleOffset(0.4);
+	h_ratio->GetYaxis()->SetLabelSize(0.085);
+	h_ratio->GetXaxis()->SetTitleSize(0.085);
+	h_ratio->GetXaxis()->SetTitleOffset(1.2);
+	h_ratio->GetXaxis()->SetLabelSize(0.085);
+	h_ratio->Draw("L");
+	cNP->cd();
+
 }
 
 
 void getNonPhotonicNormalizationFactors()
 {
 	//First, add up contributions from all NP sources
-	TH1D *h_pt_np = (TH1D*) h_pT_jpsi->Clone("h_pt_np");
-	h_pt_np->Add(h_pT_ke3);
-	h_pt_np->Add(h_pT_hf);
+	h_pT_np = (TH1D*) h_pT_jpsi->Clone("h_pT_np");
+	h_pT_np->Add(h_pT_ke3);
+	h_pT_np->Add(h_pT_hf);
 
 	//Now, compute normalization factors using FNP
 	h_norm_ke3 = (TH1D*) h_pT_ke3->Clone("h_norm_ke3");
 	h_norm_jpsi = (TH1D*) h_pT_jpsi->Clone("h_norm_jpsi");
 
-	h_norm_ke3->Divide(h_pt_np);
-	h_norm_jpsi->Divide(h_pt_np);
+	h_norm_ke3->Divide(h_pT_np);
+	h_norm_jpsi->Divide(h_pT_np);
 
 	for (int i = 1; i <= h_norm_ke3->GetNbinsX(); i++)
 	{
@@ -349,12 +449,17 @@ void getNonPhotonicNormalizationFactors()
 		norm_ke3 = norm_ke3 * f_fnp_fit_with_veto->Eval(pT);
 		h_norm_ke3->SetBinContent(i, norm_ke3);
 		h_norm_ke3->SetBinError(i, h_norm_ke3->GetBinError(i) * f_fnp_fit_with_veto->Eval(pT));
+	}
 
+	for (int i = 1; i <= h_norm_jpsi->GetNbinsX(); i++)
+	{
+		float pT = h_norm_jpsi->GetBinCenter(i);
 		float norm_jpsi = h_norm_jpsi->GetBinContent(i);
 		norm_jpsi = norm_jpsi * f_fnp_fit_with_veto->Eval(pT);
-		h_norm_jpsi->SetBinContent(i, norm_jpsi);
 		h_norm_jpsi->SetBinError(i, h_norm_jpsi->GetBinError(i)* f_fnp_fit_with_veto->Eval(pT));
+		h_norm_jpsi->SetBinContent(i, norm_jpsi);
 	}
+
 }
 
 
@@ -1145,18 +1250,18 @@ void plotFNP(int index)
 	}
 
 	//Plot FNP from template fitting method in the first three bins (July 20 - 2017)
-	float pT15[3] = {1.25, 1.75, 2.25};
+	float pT15[5] = {1.25, 1.75, 2.25, 2.75, 3.25};
 
-	float fnp_B0[3] = {0.17, 0.25, 0.342};
-	float fnp_err_B0[3] = {0.0};
+	float fnp_B0[5] = {0.17, 0.25, 0.342, 0.43, 0.47};
+	float fnp_err_B0[4] = {0.0};
 
-	float fnp_B1[3] = {0.167, 0.26, 0.355};
-	float fnp_err_B1[3] = {0.0};
+	float fnp_B1[5] = {0.167, 0.26, 0.355, 0.44, 0.52};
+	float fnp_err_B1[4] = {0.0};
 
-	float err_x[7] = {0.0};
+	float err_x[5] = {0.0};
 
-	TGraphErrors *g_fnp_B0 = new TGraphErrors(3, pT15, fnp_B0, err_x, fnp_err_B0);
-	TGraphErrors *g_fnp_B1 = new TGraphErrors(3, pT15, fnp_B1, err_x, fnp_err_B1);
+	TGraphErrors *g_fnp_B0 = new TGraphErrors(5, pT15, fnp_B0, err_x, fnp_err_B0);
+	TGraphErrors *g_fnp_B1 = new TGraphErrors(5, pT15, fnp_B1, err_x, fnp_err_B1);
 
 	//Plot FNP from template fitting method (May 9 - 2017)
 	/*
@@ -1239,10 +1344,48 @@ void plotNormalization()
 	h_norm_jpsi->SetMarkerSize(0.6);
 
 	formatHistograms(h_norm_ke3, "p_{T} [GeV/c]", "Non-Photonic Normalization Factor", " ");
-	h_norm_ke3->GetYaxis()->SetRangeUser(0, 1.0);
+	h_norm_ke3->GetYaxis()->SetRangeUser(1E-10, 1.0);
+	h_norm_ke3->GetXaxis()->SetRangeUser(1.0, 10.0);
 
+	cNonPhotonicNorm->SetLogy();
 	h_norm_ke3->Draw("P");
 	h_norm_jpsi->Draw("P,same");
+}
+
+void plotNonPhotonicComponents()
+{
+	TCanvas *cNonPhotonicComponents = new TCanvas("cNonPhotonicComponents", "cNonPhotonicComponents", 600, 600);
+	cNonPhotonicComponents->SetLogy();
+
+	h_pT_ke3->SetLineColor(kBlue);
+	h_pT_ke3->SetMarkerColor(kBlue);
+	h_pT_ke3->SetMarkerSize(0.3);
+	h_pT_ke3->SetMarkerStyle(20);
+
+	h_pT_jpsi->SetLineColor(kRed);
+	h_pT_jpsi->SetMarkerColor(kRed);
+	h_pT_jpsi->SetMarkerSize(0.4);
+	h_pT_jpsi->SetMarkerStyle(20);
+
+	h_pT_hf->SetLineColor(kGreen + 3);
+	h_pT_hf->SetMarkerColor(kGreen + 3);
+	h_pT_hf->SetMarkerSize(0.4);
+	h_pT_hf->SetMarkerStyle(20);
+
+	h_pT_np->SetLineColor(kBlack);
+	h_pT_np->SetMarkerColor(kBlack);
+	h_pT_np->SetMarkerSize(0.5);
+	h_pT_np->SetMarkerStyle(20);
+
+	f_hf_fit->SetLineColor(kGreen + 3);
+
+	formatHistograms(h_pT_ke3, "p_{T} [GeV/c]", "Ed^{3}#sigma/dp_{T}", " ");
+
+	h_pT_ke3->GetXaxis()->SetRangeUser(1.0, 10.0);
+	h_pT_ke3->Draw("P");
+	h_pT_jpsi->Draw("P,same");
+	h_pT_hf->Draw("P,same");
+	//h_pT_np->Draw("P,same");
 }
 
 
@@ -1351,18 +1494,18 @@ void plotFNP()
 	*/
 
 	//Plot FNP from template fitting method in the first three bins (July 20 - 2017)
-	float pT15[3] = {1.25, 1.75, 2.25};
+	float pT15[5] = {1.25, 1.75, 2.25, 2.75, 3.25};
 
-	float fnp_B0[3] = {0.17, 0.25, 0.34};
-	float fnp_err_B0[3] = {0.0};
+	float fnp_B0[5] = {0.17, 0.25, 0.342, 0.43, 0.47};
+	float fnp_err_B0[4] = {0.0};
 
-	float fnp_B1[3] = {0.173, 0.263, 0.36};
-	float fnp_err_B1[3] = {0.0};
+	float fnp_B1[5] = {0.167, 0.26, 0.355, 0.44, 0.52};
+	float fnp_err_B1[4] = {0.0};
 
-	float err_x[7] = {0.0};
+	float err_x[5] = {0.0};
 
-	TGraphErrors *g_fnp_B0 = new TGraphErrors(3, pT15, fnp_B0, err_x, fnp_err_B0);
-	TGraphErrors *g_fnp_B1 = new TGraphErrors(3, pT15, fnp_B1, err_x, fnp_err_B1);
+	TGraphErrors *g_fnp_B0 = new TGraphErrors(5, pT15, fnp_B0, err_x, fnp_err_B0);
+	TGraphErrors *g_fnp_B1 = new TGraphErrors(5, pT15, fnp_B1, err_x, fnp_err_B1);
 
 	g_fnp_B0->SetMarkerStyle(20);
 	g_fnp_B0->SetMarkerSize(0.7);
@@ -1619,8 +1762,9 @@ void calculateSystematicsFNP()
 	//plotKilledEfficiency();
 	//plotDataElectrons();
 	plotFNP();
-	plotRCP();
+	//plotRCP();
+	plotNonPhotonicComponents();
 	plotNormalization();
-	plotSystematicRatio();
+	//plotSystematicRatio();
 	//saveFiles();
 }
