@@ -118,9 +118,18 @@ TH1D *h_killed_efficiency;
 //RCP -- Ratio of conversion to photonic (Dalitz + Conversion) electrons passing veto cut
 TH1D *h_RCP[NUMFNPS];
 
+//Ratio of electrons from a given photonic source, to electrons from all photonic sources
+TH1D *h_photonic_fraction_pizero[NUMFNPS];
+TH1D *h_photonic_fraction_eta[NUMFNPS];
+TH1D *h_photonic_fraction_photon[NUMFNPS];
+
 //Normalization factors for conversions and Dalitz
 TH1D *h_normalization_conv;
 TH1D *h_normalization_dalitz;
+
+TH1D *h_normalization_pizero;
+TH1D *h_normalization_eta;
+TH1D *h_normalization_photon;
 
 //FNP
 TH1D *h_P[NUMFNPS];
@@ -370,7 +379,7 @@ void fitHFgraph()
 	g_pT_hf_ppg077->SetMarkerColor(kBlack);
 	g_pT_hf_ppg077->Draw("P,same");
 	f_hf_fit->Draw("same");
-	
+
 	TLatex latex;
 	latex.SetNDC();
 	latex.SetTextSize(0.025);
@@ -398,11 +407,11 @@ void fitHFgraph()
 
 	//Create ratio
 	TH1D *h_ratio = (TH1D*) h_pT_hf->Clone("h_ratio");
-	for(int i=0; i < g_pT_hf_ppg077->GetN(); i++)
+	for (int i = 0; i < g_pT_hf_ppg077->GetN(); i++)
 	{
 		double pT, gval;
 		g_pT_hf_ppg077->GetPoint(i, pT, gval);
-		h_ratio->SetBinContent(i+1, gval/f_hf_fit->Eval(pT));
+		h_ratio->SetBinContent(i + 1, gval / f_hf_fit->Eval(pT));
 	}
 
 	h_ratio->SetMarkerStyle(7);
@@ -805,6 +814,17 @@ void calculateConversionEfficiencyAndRCP()
 					h_pT_photonic_accepted[numHisto] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_pT_photonic_%i_%i_%i_%i", i, j, k, m));
 					h_pT_photonic_accepted[numHisto]->Add(h_aux_pizeros);
 					h_pT_photonic_accepted[numHisto]->Add(h_aux_etas);
+
+					//Calculate photonic fraction for each source (eta, pizero, photon)
+					h_photonic_fraction_pizero[numHisto] = (TH1D*) h_aux_pizeros->Clone(Form("h_photonic_fraction_pizero_%i_%i_%i_%i", i, j, k, m));
+					h_photonic_fraction_pizero[numHisto]->Divide(h_pT_photonic_accepted[numHisto]);
+
+					h_photonic_fraction_eta[numHisto] = (TH1D*) h_aux_etas->Clone(Form("h_photonic_fraction_eta_%i_%i_%i_%i", i, j, k, m));
+					h_photonic_fraction_eta[numHisto]->Divide(h_pT_photonic_accepted[numHisto]);
+
+					h_photonic_fraction_photon[numHisto] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_photonic_fraction_photon_%i_%i_%i_%i", i, j, k, m));
+					h_photonic_fraction_photon[numHisto]->Divide(h_pT_photonic_accepted[numHisto]);
+
 					numHisto++;
 				}
 			}
@@ -884,6 +904,16 @@ void getPhotonicNormalizationFactors()
 		float normFactor = (1.0 - h_normalization_dalitz->GetBinContent(i)) * (1.0 - h_FNP_conv[0]->GetBinContent(i));
 		h_normalization_dalitz->SetBinContent(i, normFactor);
 	}
+
+	//Get the normalization factors for individual photonic cocktail components as follows
+	// --> ith source: (1-FNP) x ith photonic fraction
+	h_normalization_pizero = (TH1D*) h_FNP_conv[0]->Clone("h_normalization_pizero");
+	h_normalization_eta = (TH1D*) h_FNP_conv[0]->Clone("h_normalization_eta");
+	h_normalization_photon = (TH1D*) h_FNP_conv[0]->Clone("h_normalization_photon");
+
+	h_normalization_pizero->Multiply(h_photonic_fraction_pizero[0]);
+	h_normalization_eta->Multiply(h_photonic_fraction_eta[0]);
+	h_normalization_photon->Multiply(h_photonic_fraction_photon[0]);
 }
 
 
@@ -1350,6 +1380,37 @@ void plotNormalization()
 	cNonPhotonicNorm->SetLogy();
 	h_norm_ke3->Draw("P");
 	h_norm_jpsi->Draw("P,same");
+
+	//Photonic normalization for individual cocktail components
+	TCanvas *cPhotonicNormComponents = new TCanvas("cPhotonicNormComponents", "cPhotonicNormComponents", 600, 600);
+
+	h_normalization_pizero->SetMarkerColor(kBlue);
+	h_normalization_pizero->SetLineColor(kBlue);
+	h_normalization_pizero->SetMarkerStyle(20);
+	h_normalization_pizero->SetMarkerSize(0.8);
+
+	h_normalization_eta->SetMarkerColor(kRed);
+	h_normalization_eta->SetLineColor(kRed);
+	h_normalization_eta->SetMarkerStyle(20);
+	h_normalization_eta->SetMarkerSize(0.6);
+
+	h_normalization_photon->SetMarkerColor(kGreen + 3);
+	h_normalization_photon->SetLineColor(kGreen + 3);
+	h_normalization_photon->SetMarkerStyle(20);
+	h_normalization_photon->SetMarkerSize(0.6);
+
+	formatHistograms(h_normalization_pizero, "p_{T} [GeV/c]", "Photonic Normalization Factor", " ");
+	h_normalization_pizero->GetYaxis()->SetRangeUser(0.0, 1.0);
+	h_normalization_pizero->Draw("P");
+	h_normalization_eta->Draw("P,same");
+	h_normalization_photon->Draw("P,same");
+
+	TLegend *legPhotNormComp = new TLegend(0.18, 0.7, 0.48, 0.85);
+	legPhotNormComp->SetLineColor(kWhite);
+	legPhotNormComp->AddEntry(h_normalization_pizero, "#pi^{0} (Dalitz + Conversion)", "P");
+	legPhotNormComp->AddEntry(h_normalization_eta, "#eta (Dalitz + Conversion)", "P");
+	legPhotNormComp->AddEntry(h_normalization_photon, "#gamma (Conversion)", "P");
+	legPhotNormComp->Draw("same");
 }
 
 void plotNonPhotonicComponents()
@@ -1736,7 +1797,7 @@ void fitFNP()
 void calculateSystematicsFNP()
 {
 	readFiles();
-	//setSimErrorsToZero();
+	setSimErrorsToZero();
 	rebinHistograms();
 	defineSpectra();
 	calculateSpeciesSurvival();
