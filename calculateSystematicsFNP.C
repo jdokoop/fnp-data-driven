@@ -475,9 +475,9 @@ void getNonPhotonicNormalizationFactors()
 void readFiles()
 {
 	//Files from simulation
-	TFile *fSimsPizero = new TFile("Sims/Cocktail062617_2/twopizeros_cdphiana.root");
-	TFile *fSimsPhoton = new TFile("Sims/Cocktail062617_2/twophotons_cdphiana.root");
-	TFile *fSimsEta = new TFile("Sims/Cocktail062617_2/twoetas_cdphiana.root");
+	TFile *fSimsPizero = new TFile("Sims/Cocktail080117/twopizeros_cdphiana.root");
+	TFile *fSimsPhoton = new TFile("Sims/Cocktail080117/twophotons_cdphiana.root");
+	TFile *fSimsEta = new TFile("Sims/Cocktail080117/twoetas_cdphiana.root");
 
 	for (int i = 0; i < NVARPIZEROS; i++)
 	{
@@ -1510,21 +1510,21 @@ void plotFNP()
 			}
 			else
 			{
-				h_FNP[index]->Draw();
-				h_FNP_conv[index]->Draw("same");
+				//h_FNP[index]->Draw();
+				//h_FNP_conv[index]->Draw("same");
 			}
 		}
 		else
 		{
 			if (effErrors)
 			{
-				g_eff_FNP[index]->Draw("LX,same");
-				g_eff_FNP_conv[index]->Draw("LX,same");
+				//g_eff_FNP[index]->Draw("LX,same");
+				//g_eff_FNP_conv[index]->Draw("LX,same");
 			}
 			else
 			{
-				h_FNP[index]->Draw("same");
-				h_FNP_conv[index]->Draw("same");
+				//h_FNP[index]->Draw("same");
+				//h_FNP_conv[index]->Draw("same");
 			}
 		}
 	}
@@ -1533,10 +1533,10 @@ void plotFNP()
 	g_eff_FNP_conv[0]->Draw("P,same");
 
 	f_fnp_fit_without_veto->SetLineColor(kBlue);
-	f_fnp_fit_without_veto->Draw("same");
+	//f_fnp_fit_without_veto->Draw("same");
 
 	f_fnp_fit_with_veto->SetLineColor(kRed);
-	f_fnp_fit_with_veto->Draw("same");
+	//f_fnp_fit_with_veto->Draw("same");
 
 	//Plot FNP from template fitting method (May 9 - 2017)
 	/*
@@ -1555,15 +1555,15 @@ void plotFNP()
 	*/
 
 	//Plot FNP from template fitting method in the first three bins (July 20 - 2017)
-	float pT15[5] = {1.25, 1.75, 2.25, 2.75, 3.25};
+	float pT15[4] = {1.25, 1.75, 2.25, 2.75};
 
-	float fnp_B0[5] = {0.17, 0.25, 0.342, 0.43, 0.47};
+	float fnp_B0[4] = {0.17, 0.25, 0.342, 0.43};
 	float fnp_err_B0[4] = {0.0};
 
-	float fnp_B1[5] = {0.167, 0.26, 0.355, 0.44, 0.52};
+	float fnp_B1[4] = {0.167, 0.26, 0.355, 0.44};
 	float fnp_err_B1[4] = {0.0};
 
-	float err_x[5] = {0.0};
+	float err_x[4] = {0.0};
 
 	TGraphErrors *g_fnp_B0 = new TGraphErrors(5, pT15, fnp_B0, err_x, fnp_err_B0);
 	TGraphErrors *g_fnp_B1 = new TGraphErrors(5, pT15, fnp_B1, err_x, fnp_err_B1);
@@ -1597,8 +1597,8 @@ void plotFNP()
 
 	TLegend *legFNP = new TLegend(0.3, 0.15, 0.85, 0.40);
 	legFNP->SetLineColor(kWhite);
-	legFNP->AddEntry(g_eff_FNP_conv[0], "F_{NP} (Algebraic) in B0 - With Veto Cut", "P");
-	legFNP->AddEntry(g_eff_FNP[0], "F_{NP} (Algebraic) in B1 - No Veto Cut", "P");
+	legFNP->AddEntry(g_eff_FNP_conv[0], "F_{NP} (Algebraic) - With Veto Cut", "P");
+	legFNP->AddEntry(g_eff_FNP[0], "F_{NP} (Algebraic) - No Veto Cut", "P");
 	legFNP->AddEntry(g_fnp_B0, "F_{NP} (Template Fitting) in B0 - No Veto Cut", "P");
 	legFNP->AddEntry(g_fnp_B1, "F_{NP} (Template Fitting) in B1 - No Veto Cut", "P");
 	legFNP->Draw("same");
@@ -1640,20 +1640,6 @@ void plotSpeciesSurival()
 }
 
 
-void plotConversionEfficiency()
-{
-	TCanvas *cConversionEfficiency = new TCanvas("cConversionEfficiency", "cConversionEfficiency", 600, 600);
-	formatHistograms(h_conversion_efficiency, "p_{T} [GeV/c]", "Survival Rate for Photonic Electrons", " ");
-	h_conversion_efficiency->GetYaxis()->SetRangeUser(0.0, 1.0);
-	h_conversion_efficiency->Draw();
-
-	if (savePlots)
-	{
-		cConversionEfficiency->SaveAs("Plots/ConversionEfficiency.pdf");
-	}
-}
-
-
 void plotDataElectrons()
 {
 	TCanvas *cElectrons = new TCanvas("cElectrons", "cElectrons", 600, 600);
@@ -1679,6 +1665,21 @@ void saveFiles()
 	h_survival_etas->Write();
 }
 */
+
+
+void plotConversionEfficiency()
+{
+	TCanvas *cConversionEfficiency = new TCanvas("cConversionEfficiency", "cConversionEfficiency", 600, 600);
+	formatHistograms(h_conversion_efficiency[0], "p_{T} [GeV/c]", "Survival Rate for Photonic Electrons", " ");
+
+	h_conversion_efficiency[0]->SetMarkerColor(kBlue);
+	h_conversion_efficiency[0]->SetMarkerStyle(20);
+	h_conversion_efficiency[0]->SetMarkerSize(0.7);
+
+	h_conversion_efficiency[0]->GetYaxis()->SetRangeUser(0.0, 1.0);
+	h_conversion_efficiency[0]->Draw("P");
+}
+
 
 void plotSystematicRatio()
 {
@@ -1794,10 +1795,33 @@ void fitFNP()
 	g_eff_FNP_conv[0]->Fit(f_fnp_fit_with_veto, "Q0R");
 }
 
+
+void printFNP(int index)
+{
+	for(int i=1; i<= h_FNP[index]->GetNbinsX(); i++)
+	{
+		cout << "pT = " << h_FNP[index]->GetBinCenter(i) << "; FNP = " << h_FNP[index]->GetBinContent(i) << endl;
+	}
+}
+
+
+void saveFiles()
+{
+	//Save photonic normalizations
+	TFile *fNorm = new TFile("NormalizationFactors.root", "RECREATE");
+	h_normalization_pizero->Write();
+	h_normalization_eta->Write();
+	h_normalization_photon->Write();
+	h_norm_ke3->Write();
+	h_norm_jpsi->Write();
+	fNorm->Close();
+}
+
+
 void calculateSystematicsFNP()
 {
 	readFiles();
-	setSimErrorsToZero();
+	//setSimErrorsToZero();
 	rebinHistograms();
 	defineSpectra();
 	calculateSpeciesSurvival();
@@ -1809,6 +1833,7 @@ void calculateSystematicsFNP()
 	getRatiosToDefault();
 	getPhotonicNormalizationFactors();
 	fitFNP();
+	printFNP(0);
 
 	//Calculate NP normalization
 	readCocktailFiles();
@@ -1824,8 +1849,8 @@ void calculateSystematicsFNP()
 	//plotDataElectrons();
 	plotFNP();
 	//plotRCP();
-	plotNonPhotonicComponents();
-	plotNormalization();
+	//plotNonPhotonicComponents();
+	//plotNormalization();
 	//plotSystematicRatio();
 	//saveFiles();
 }
