@@ -22,6 +22,13 @@ float pizeroPhotonRatio = 1.0;
 //2: Eta
 int colorCodeVariation = 0;
 
+//Which VTX layers to use in veto cut?
+//0: All layers
+//1: Only B0, B1
+//2: Only B0
+//3: Only B1
+int vetoLayers = 0;
+
 //Rebin factor
 const int REBINF = 40;
 
@@ -89,6 +96,16 @@ TH1D *h_elec_pT_photons_dalitz_accepted[NVARPHOTONS];
 TH1D *h_elec_pT_etas_conv_accepted[NVARETAS];
 TH1D *h_elec_pT_etas_dalitz_accepted[NVARETAS];
 
+//Inclusive Dalitz and conversion electrons in simulations
+TH1D *h_elec_pT_pizeros_conv[NVARPIZEROS];
+TH1D *h_elec_pT_pizeros_dalitz[NVARPIZEROS];
+
+TH1D *h_elec_pT_photons_conv[NVARPHOTONS];
+TH1D *h_elec_pT_photons_dalitz[NVARPHOTONS];
+
+TH1D *h_elec_pT_etas_conv[NVARETAS];
+TH1D *h_elec_pT_etas_dalitz[NVARETAS];
+
 //Data electrons + hadrons
 TH1D *h_elec_pT;
 TH1D *h_elec_pT_rejected;
@@ -110,6 +127,11 @@ TH1D *h_elec_pT_isolated;
 TH1D *h_survival_photons[NVARPHOTONS];
 TH1D *h_survival_pizeros[NVARPIZEROS];
 TH1D *h_survival_etas[NVARETAS];
+
+//Survival rate for conversion and Dalitz electrons
+//This is defined only for default systematic combination
+TH1D *h_survival_dalitz;
+TH1D *h_survival_conversion;
 
 //Ingredients for FNP calculation
 TH1D *h_conversion_efficiency[NUMFNPS];
@@ -479,50 +501,86 @@ void readFiles()
 	TFile *fSimsPhoton = new TFile("Sims/Cocktail080117/twophotons_cdphiana.root");
 	TFile *fSimsEta = new TFile("Sims/Cocktail080117/twoetas_cdphiana.root");
 
+	string vetoSelection = "";
+	if (vetoLayers == 0)
+	{
+		vetoSelection = "pTcut";
+	}
+	else if (vetoLayers == 1)
+	{
+		vetoSelection = "pTcut_pix";
+	}
+	else if (vetoLayers == 2)
+	{
+		vetoSelection = "pTcut_b0";
+	}
+	else if (vetoLayers == 3)
+	{
+		vetoSelection = "pTcut_b1";
+	}
+
 	for (int i = 0; i < NVARPIZEROS; i++)
 	{
 		h_elec_pT_pizeros[i]                 = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_%i", i));
-		h_elec_pT_pizeros_rejected[i]        = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i", i));
-		h_elec_pT_pizeros_accepted[i]        = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i", i));
+		h_elec_pT_pizeros_rejected[i]        = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_rejected_%s_%i", vetoSelection.c_str(), i));
+		h_elec_pT_pizeros_accepted[i]        = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
 
-		h_elec_pT_pizeros_conv_accepted[i]   = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_conv_pT_notrejected_pTcut_%i", i));
-		h_elec_pT_pizeros_dalitz_accepted[i] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_dalitz_pT_notrejected_pTcut_%i", i));
+		h_elec_pT_pizeros_conv_accepted[i]   = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_conv_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
+		h_elec_pT_pizeros_dalitz_accepted[i] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_dalitz_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
+
+		h_elec_pT_pizeros_conv[i]   = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_conv_pT_%i", i));
+		h_elec_pT_pizeros_dalitz[i] = (TH1D*) fSimsPizero->Get(Form("h_scaled_elec_dalitz_pT_%i", i));
 	}
 
 	for (int i = 0; i < NVARETAS; i++)
 	{
 		h_elec_pT_etas[i]                 = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_%i", i));
-		h_elec_pT_etas_rejected[i]        = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i", i));
-		h_elec_pT_etas_accepted[i]        = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i", i));
+		h_elec_pT_etas_rejected[i]        = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_rejected_%s_%i", vetoSelection.c_str(), i));
+		h_elec_pT_etas_accepted[i]        = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
 
-		h_elec_pT_etas_conv_accepted[i]   = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_conv_pT_notrejected_pTcut_%i", i));
-		h_elec_pT_etas_dalitz_accepted[i] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_dalitz_pT_notrejected_pTcut_%i", i));
+		h_elec_pT_etas_conv_accepted[i]   = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_conv_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
+		h_elec_pT_etas_dalitz_accepted[i] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_dalitz_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
+
+		h_elec_pT_etas_conv[i]   = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_conv_pT_%i", i));
+		h_elec_pT_etas_dalitz[i] = (TH1D*) fSimsEta->Get(Form("h_scaled_elec_dalitz_pT_%i", i));
 	}
 
 	for (int i = 0; i < NVARPHOTONS; i++)
 	{
 		h_elec_pT_photons[i]                 = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_%i", i));
-		h_elec_pT_photons_rejected[i]        = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_rejected_pTcut_%i", i));
-		h_elec_pT_photons_accepted[i]        = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_notrejected_pTcut_%i", i));
+		h_elec_pT_photons_rejected[i]        = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_rejected_%s_%i", vetoSelection.c_str(), i));
+		h_elec_pT_photons_accepted[i]        = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
 
-		h_elec_pT_photons_conv_accepted[i]   = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_conv_pT_notrejected_pTcut_%i", i));
-		h_elec_pT_photons_dalitz_accepted[i] = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_dalitz_pT_notrejected_pTcut_%i", i));
+		h_elec_pT_photons_conv_accepted[i]   = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_conv_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
+		h_elec_pT_photons_dalitz_accepted[i] = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_dalitz_pT_notrejected_%s_%i", vetoSelection.c_str(), i));
+
+		h_elec_pT_photons_conv[i]   = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_conv_pT_%i", i));
+		h_elec_pT_photons_dalitz[i] = (TH1D*) fSimsPhoton->Get(Form("h_scaled_elec_dalitz_pT_%i", i));
 	}
 
 	//Files from data
-	TFile *fData = new TFile("Data/11167/calcsurvivalrate.root");
+	TFile *fData = new TFile("Data/11568/calcsurvivalrate.root");
+
+	if (vetoLayers == 2)
+	{
+		vetoSelection = "pTcut_B0";
+	}
+	else if (vetoLayers == 3)
+	{
+		vetoSelection = "pTcut_B1";
+	}
 
 	h_elec_pT          = (TH1D*) fData->Get("h_elec_pT");
-	h_elec_pT_rejected = (TH1D*) fData->Get("h_elec_pT_rejected_pTcut");
-	h_elec_pT_accepted = (TH1D*) fData->Get("h_elec_pT_notrejected_pTcut");
+	h_elec_pT_rejected = (TH1D*) fData->Get(Form("h_elec_pT_rejected_%s", vetoSelection.c_str()));
+	h_elec_pT_accepted = (TH1D*) fData->Get(Form("h_elec_pT_notrejected_%s", vetoSelection.c_str()));
 
 	h_elec_sw_pT          = (TH1D*) fData->Get("h_elec_sw_pT");
-	h_elec_sw_pT_rejected = (TH1D*) fData->Get("h_elec_sw_pT_rejected_pTcut");
-	h_elec_sw_pT_accepted = (TH1D*) fData->Get("h_elec_sw_pT_notrejected_pTcut");
+	h_elec_sw_pT_rejected = (TH1D*) fData->Get(Form("h_elec_sw_pT_rejected_%s", vetoSelection.c_str()));
+	h_elec_sw_pT_accepted = (TH1D*) fData->Get(Form("h_elec_sw_pT_notrejected_%s", vetoSelection.c_str()));
 
 	h_hadron_pT          = (TH1D*) fData->Get("h_hadron_pT");
-	h_hadron_pT_rejected = (TH1D*) fData->Get("h_hadron_pT_rejected_pTcut");
-	h_hadron_pT_accepted = (TH1D*) fData->Get("h_hadron_pT_notrejected_pTcut");
+	h_hadron_pT_rejected = (TH1D*) fData->Get(Form("h_hadron_pT_rejected_%s", vetoSelection.c_str()));
+	h_hadron_pT_accepted = (TH1D*) fData->Get(Form("h_hadron_pT_notrejected_%s", vetoSelection.c_str()));
 }
 
 
@@ -619,6 +677,8 @@ void rebinHistograms()
 		h_elec_pT_pizeros_accepted[i] = (TH1D*) h_elec_pT_pizeros_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_accepted_rebinned_%i", i), bins);
 		h_elec_pT_pizeros_conv_accepted[i] = (TH1D*) h_elec_pT_pizeros_conv_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_conv_accepted_rebinned_%i", i), bins);
 		h_elec_pT_pizeros_dalitz_accepted[i] = (TH1D*) h_elec_pT_pizeros_dalitz_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_dalitz_accepted_rebinned_%i", i), bins);
+		h_elec_pT_pizeros_conv[i] = (TH1D*) h_elec_pT_pizeros_conv[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_conv_rebinned_%i", i), bins);
+		h_elec_pT_pizeros_dalitz[i] = (TH1D*) h_elec_pT_pizeros_dalitz[i]->Rebin(NBINSFNP, Form("h_elec_pT_pizeros_dalitz_rebinned_%i", i), bins);
 	}
 
 	for (int i = 0; i < NVARETAS; i++)
@@ -628,6 +688,8 @@ void rebinHistograms()
 		h_elec_pT_etas_accepted[i] = (TH1D*) h_elec_pT_etas_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_accepted_rebinned_%i", i), bins);
 		h_elec_pT_etas_conv_accepted[i] = (TH1D*) h_elec_pT_etas_conv_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_conv_accepted_rebinned_%i", i), bins);
 		h_elec_pT_etas_dalitz_accepted[i] = (TH1D*) h_elec_pT_etas_dalitz_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_dalitz_accepted_rebinned_%i", i), bins);
+		h_elec_pT_etas_conv[i] = (TH1D*) h_elec_pT_etas_conv[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_conv_rebinned_%i", i), bins);
+		h_elec_pT_etas_dalitz[i] = (TH1D*) h_elec_pT_etas_dalitz[i]->Rebin(NBINSFNP, Form("h_elec_pT_etas_dalitz_rebinned_%i", i), bins);
 	}
 
 	for (int i = 0; i < NVARPHOTONS; i++)
@@ -637,6 +699,8 @@ void rebinHistograms()
 		h_elec_pT_photons_accepted[i] = (TH1D*) h_elec_pT_photons_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_accepted_rebinned_%i", i), bins);
 		h_elec_pT_photons_conv_accepted[i] = (TH1D*) h_elec_pT_photons_conv_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_conv_accepted_rebinned_%i", i), bins);
 		h_elec_pT_photons_dalitz_accepted[i] = (TH1D*) h_elec_pT_photons_dalitz_accepted[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_dalitz_accepted_rebinned_%i", i), bins);
+		h_elec_pT_photons_conv[i] = (TH1D*) h_elec_pT_photons_conv[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_conv_rebinned_%i", i), bins);
+		h_elec_pT_photons_dalitz[i] = (TH1D*) h_elec_pT_photons_dalitz[i]->Rebin(NBINSFNP, Form("h_elec_pT_photons_dalitz_rebinned_%i", i), bins);
 	}
 
 	h_elec_pT = (TH1D*) h_elec_pT->Rebin(NBINSFNP, "h_elec_pT_rebinned", bins);
@@ -695,6 +759,7 @@ void defineSpectra()
 
 void calculateSpeciesSurvival()
 {
+	//Survival rate for each individual particle species
 	//Survival = Accepted / Total
 	for (int i = 0; i < NVARETAS; i++)
 	{
@@ -713,6 +778,27 @@ void calculateSpeciesSurvival()
 		h_survival_photons[i] = (TH1D*) h_elec_pT_photons_accepted[i]->Clone(Form("h_survival_photons_%i", i));
 		h_survival_photons[i]->Divide(h_elec_pT_photons[i]);
 	}
+
+	//Survival rate for Dalitz and conversion electrons
+	h_survival_dalitz = (TH1D*) h_elec_pT_pizeros_dalitz_accepted[0]->Clone("h_survival_dalitz");
+	h_survival_dalitz->Add(h_elec_pT_etas_dalitz_accepted[0]);
+	h_survival_dalitz->Add(h_elec_pT_photons_dalitz_accepted[0]);
+
+	TH1D *h_aux1 = (TH1D*) h_elec_pT_pizeros_dalitz[0]->Clone("h_aux1");
+	h_aux1->Add(h_elec_pT_etas_dalitz[0]);
+	h_aux1->Add(h_elec_pT_photons_dalitz[0]);
+
+	h_survival_dalitz->Divide(h_aux1);
+
+	h_survival_conversion = (TH1D*) h_elec_pT_pizeros_conv_accepted[0]->Clone("h_survival_conversion");
+	h_survival_conversion->Add(h_elec_pT_etas_conv_accepted[0]);
+	h_survival_conversion->Add(h_elec_pT_photons_conv_accepted[0]);
+
+	TH1D *h_aux2 = (TH1D*) h_elec_pT_pizeros_conv[0]->Clone("h_aux2");
+	h_aux2->Add(h_elec_pT_etas_conv[0]);
+	h_aux2->Add(h_elec_pT_photons_conv[0]);
+
+	h_survival_conversion->Divide(h_aux2);
 }
 
 
@@ -1669,7 +1755,8 @@ void saveFiles()
 
 void plotConversionEfficiency()
 {
-	TCanvas *cConversionEfficiency = new TCanvas("cConversionEfficiency", "cConversionEfficiency", 600, 600);
+	//All photonic electrons
+	TCanvas *cPhotonicEfficiency = new TCanvas("cPhotonicEfficiency", "cPhotonicEfficiency", 600, 600);
 	formatHistograms(h_conversion_efficiency[0], "p_{T} [GeV/c]", "Survival Rate for Photonic Electrons", " ");
 
 	h_conversion_efficiency[0]->SetMarkerColor(kBlue);
@@ -1678,6 +1765,28 @@ void plotConversionEfficiency()
 
 	h_conversion_efficiency[0]->GetYaxis()->SetRangeUser(0.0, 1.0);
 	h_conversion_efficiency[0]->Draw("P");
+
+	//Conversion electrons
+	TCanvas *cSurvivalConversion = new TCanvas("cSurvivalConversion", "cSurvivalConversion", 600, 600);
+	formatHistograms(h_survival_conversion, "p_{T} [GeV/c]", "Survival Rate for Conversion Electrons", " ");
+
+	h_survival_conversion->SetMarkerColor(kBlue);
+	h_survival_conversion->SetMarkerStyle(20);
+	h_survival_conversion->SetMarkerSize(0.7);
+
+	h_survival_conversion->GetYaxis()->SetRangeUser(0.0, 1.0);
+	h_survival_conversion->Draw("P");
+
+	//Dalitz electrons
+	TCanvas *cSurvivalDalitz = new TCanvas("cSurvivalDalitz", "cSurvivalDalitz", 600, 600);
+	formatHistograms(h_survival_dalitz, "p_{T} [GeV/c]", "Survival Rate for Dalitz Electrons", " ");
+
+	h_survival_dalitz->SetMarkerColor(kBlue);
+	h_survival_dalitz->SetMarkerStyle(20);
+	h_survival_dalitz->SetMarkerSize(0.7);
+
+	h_survival_dalitz->GetYaxis()->SetRangeUser(0.0, 1.0);
+	h_survival_dalitz->Draw("P");
 }
 
 
@@ -1798,7 +1907,7 @@ void fitFNP()
 
 void printFNP(int index)
 {
-	for(int i=1; i<= h_FNP[index]->GetNbinsX(); i++)
+	for (int i = 1; i <= h_FNP[index]->GetNbinsX(); i++)
 	{
 		cout << "pT = " << h_FNP[index]->GetBinCenter(i) << "; FNP = " << h_FNP[index]->GetBinContent(i) << endl;
 	}
@@ -1844,8 +1953,8 @@ void calculateSystematicsFNP()
 	gStyle->SetOptStat(0);
 	gStyle->SetErrorX(0);
 	//plotSpeciesSurival();
-	//plotConversionEfficiency();
-	//plotKilledEfficiency();
+	plotConversionEfficiency();
+	plotKilledEfficiency();
 	//plotDataElectrons();
 	plotFNP();
 	//plotRCP();
